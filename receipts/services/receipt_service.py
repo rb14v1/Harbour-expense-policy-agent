@@ -81,8 +81,22 @@ class ReceiptService:
             receipt.status = "EXTRACTED"
             receipt.save()
 
+            if self._is_ocr_result_blank(extracted):
+                receipt.status = "FAILED"
+                receipt.duplicate_reason = "Receipt appears to be blank. No meaningful content was extracted."
+                receipt.save()
+                return receipt
+
+            if not self._is_valid_receipt(extracted):
+                receipt.status = "FAILED"
+                receipt.duplicate_reason = "Document does not appear to be a receipt. Required receipt information is missing."
+                receipt.save()
+                return receipt
+
             normalized = self.normalization_service.normalize(extracted)
             normalized['receipt_id'] = str(receipt.id)
+            if 'source' not in normalized:
+                normalized['source'] = {}
             normalized['source']['original_filename'] = receipt.original_filename
             normalized['source']['blob_reference'] = receipt.blob_name
             normalized['source']['sha256'] = receipt.sha256_hash
@@ -90,17 +104,20 @@ class ReceiptService:
             receipt.normalized_json = normalized
             receipt.status = "NORMALIZED"
 
-            if extracted.get('merchant', {}).get('name'):
-                receipt.vendor_name = extracted['merchant']['name']
-                receipt.vendor_normalized = normalized['merchant']['name']
+            # Populate Receipt model from normalized data
+            if normalized.get('vendor_name'):
+                receipt.vendor_name = normalized['vendor_name']
+            if normalized.get('vendor_normalized'):
+                receipt.vendor_normalized = normalized['vendor_normalized']
 
-            if extracted.get('invoice', {}).get('invoice_number'):
-                receipt.invoice_number = extracted['invoice']['invoice_number']
-                receipt.invoice_number_normalized = normalized['invoice']['invoice_number']
+            if normalized.get('invoice_number'):
+                receipt.invoice_number = normalized['invoice_number']
+            if normalized.get('invoice_number_normalized'):
+                receipt.invoice_number_normalized = normalized['invoice_number_normalized']
 
-            if extracted.get('invoice', {}).get('transaction_date'):
+            if normalized.get('transaction_date'):
                 from datetime import datetime
-                date_str = extracted['invoice']['transaction_date']
+                date_str = normalized['transaction_date']
                 if date_str:
                     try:
                         receipt.transaction_date = datetime.fromisoformat(
@@ -109,20 +126,20 @@ class ReceiptService:
                     except:
                         pass
 
-            if extracted.get('amounts', {}).get('subtotal'):
-                receipt.subtotal = extracted['amounts']['subtotal']
+            if normalized.get('subtotal') is not None:
+                receipt.subtotal = normalized['subtotal']
 
-            if extracted.get('amounts', {}).get('tax'):
-                receipt.tax_amount = extracted['amounts']['tax']
+            if normalized.get('tax_amount') is not None:
+                receipt.tax_amount = normalized['tax_amount']
 
-            if extracted.get('amounts', {}).get('total'):
-                receipt.total_amount = extracted['amounts']['total']
+            if normalized.get('total_amount') is not None:
+                receipt.total_amount = normalized['total_amount']
 
-            if extracted.get('amounts', {}).get('currency'):
-                receipt.currency = extracted['amounts']['currency']
+            if normalized.get('currency'):
+                receipt.currency = normalized['currency']
 
-            if extracted.get('payment', {}).get('method'):
-                receipt.payment_method = extracted['payment']['method']
+            if normalized.get('payment_method'):
+                receipt.payment_method = normalized['payment_method']
 
             receipt.save()
 
@@ -160,6 +177,58 @@ class ReceiptService:
             raise
 
         return receipt
+
+    @staticmethod
+    def _is_valid_receipt(extracted: dict) -> bool:
+        """
+        Validate that the document is actually a receipt.
+
+        Requires:
+        - merchant/vendor name (evidence of where transaction occurred)
+        - monetary/total amount (evidence of transaction value)
+        - at least one additional receipt indicator (date, invoice number, payment method, or line items)
+        """
+        if not extracted:
+            return False
+
+        merchant_name = extracted.get('merchant', {}).get('name')
+        total_amount = extracted.get('amounts', {}).get('total')
+        transaction_date = extracted.get('invoice', {}).get('transaction_date')
+        invoice_number = extracted.get('invoice', {}).get('invoice_number')
+        payment_method = extracted.get('payment', {}).get('method')
+        line_items = extracted.get('line_items', [])
+
+        has_merchant = bool(merchant_name and str(merchant_name).strip())
+        has_total = total_amount is not None
+        has_date = bool(transaction_date and str(transaction_date).strip())
+        has_invoice = bool(invoice_number and str(invoice_number).strip())
+        has_payment = bool(payment_method and str(payment_method).strip())
+        has_line_items = bool(line_items) and len(line_items) > 0
+
+        additional_indicators = sum([has_date, has_invoice, has_payment, has_line_items])
+
+        return has_merchant and has_total and additional_indicators >= 1
+
+    @staticmethod
+    def _is_ocr_result_blank(extracted: dict) -> bool:
+        """Check if OCR extraction result is completely empty/blank."""
+        if not extracted:
+            return True
+
+        merchant_name = extracted.get('merchant', {}).get('name')
+        total_amount = extracted.get('amounts', {}).get('total')
+        transaction_date = extracted.get('invoice', {}).get('transaction_date')
+        ocr_content = extracted.get('extraction', {}).get('ocr_content', '')
+
+        has_merchant = bool(merchant_name and str(merchant_name).strip())
+        has_amount = total_amount is not None
+        has_date = bool(transaction_date and str(transaction_date).strip())
+        has_ocr_text = bool(ocr_content and len(str(ocr_content).strip()) > 20)
+
+        if not (has_merchant or has_amount or has_date or has_ocr_text):
+            return True
+
+        return False
 
     @staticmethod
     def _generate_blob_name(owner: str, receipt_id, filename: str) -> str:

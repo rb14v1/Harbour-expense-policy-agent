@@ -265,6 +265,18 @@
             }
         });
 
+        document.getElementById('btn-clear').addEventListener('click', (e) => {
+            e.preventDefault();
+            fileInput.value = '';
+            fileNameDisplay.textContent = '';
+            loading.classList.remove('show');
+            resultSection.classList.remove('show');
+            resultSection.className = 'result-section';
+            resultTitle.textContent = '';
+            resultContent.innerHTML = '';
+            btnUpload.disabled = false;
+        });
+
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
 
@@ -315,6 +327,8 @@
                 if (response.ok) {
                     if (data.status === 'EXACT_DUPLICATE') {
                         showDuplicate(data);
+                    } else if (data.status === 'FAILED' || data.status === 'OCR_FAILED') {
+                        showError(data.message || 'Receipt processing failed.');
                     } else {
                         showSuccess(data);
                     }

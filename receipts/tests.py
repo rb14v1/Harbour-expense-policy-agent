@@ -16,23 +16,94 @@ import io
 
 class FileValidationServiceTests(TestCase):
     def test_valid_pdf(self):
-        file = SimpleUploadedFile("receipt.pdf", b"fake pdf", content_type="application/pdf")
+        pdf_content = (
+            b"%PDF-1.4\n"
+            b"%\xE2\xE3\xCF\xD3\n"
+            b"1 0 obj\n"
+            b"<</Type/Catalog/Pages 2 0 R>>\n"
+            b"endobj\n"
+            b"2 0 obj\n"
+            b"<</Type/Pages/Kids[3 0 R]/Count 1>>\n"
+            b"endobj\n"
+            b"3 0 obj\n"
+            b"<</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]>>\n"
+            b"endobj\n"
+            b"xref\n"
+            b"0 4\n"
+            b"0000000000 65535 f\n"
+            b"0000000009 00000 n\n"
+            b"0000000074 00000 n\n"
+            b"0000000133 00000 n\n"
+            b"trailer\n"
+            b"<</Size 4/Root 1 0 R>>\n"
+            b"startxref\n"
+            b"190\n"
+            b"%%EOF"
+        )
+        file = SimpleUploadedFile("receipt.pdf", pdf_content, content_type="application/pdf")
         FileValidationService.validate(file, "receipt.pdf")
 
     def test_valid_jpg(self):
-        file = SimpleUploadedFile("receipt.jpg", b"fake jpg", content_type="image/jpeg")
-        FileValidationService.validate(file, "receipt.jpg")
+        jpg_content = bytes([0xFF, 0xD8, 0xFF, 0xE0]) + b"JFIF" + (b"x" * 200) + bytes([0xFF, 0xD9])
+        file = SimpleUploadedFile("receipt.jpg", jpg_content, content_type="image/jpeg")
+        with self.assertRaises(UnsupportedFileTypeError):
+            FileValidationService.validate(file, "receipt.jpg")
+
+    def test_valid_png(self):
+        png_header = b'\x89PNG\r\n\x1a\n'
+        file = SimpleUploadedFile("receipt.png", png_header + (b"x" * 200), content_type="image/png")
+        with self.assertRaises(UnsupportedFileTypeError):
+            FileValidationService.validate(file, "receipt.png")
 
     def test_invalid_extension(self):
         file = SimpleUploadedFile("receipt.txt", b"fake txt", content_type="text/plain")
         with self.assertRaises(UnsupportedFileTypeError):
             FileValidationService.validate(file, "receipt.txt")
 
+    def test_empty_file(self):
+        file = SimpleUploadedFile("receipt.pdf", b"", content_type="application/pdf")
+        with self.assertRaises(UnsupportedFileTypeError) as ctx:
+            FileValidationService.validate(file, "receipt.pdf")
+        self.assertIn("empty", str(ctx.exception).lower())
+
+    def test_invalid_pdf_header(self):
+        file = SimpleUploadedFile("receipt.pdf", b"NOTAPDF content", content_type="application/pdf")
+        with self.assertRaises(UnsupportedFileTypeError) as ctx:
+            FileValidationService.validate(file, "receipt.pdf")
+        self.assertIn("pdf", str(ctx.exception).lower())
+
+    def test_pdf_missing_endobj(self):
+        pdf_content = b"%PDF-1.4\n" + (b"x" * 150) + b"\n1 0 obj\n<</Type/Catalog>>\n%%EOF"
+        file = SimpleUploadedFile("receipt.pdf", pdf_content, content_type="application/pdf")
+        with self.assertRaises(UnsupportedFileTypeError) as ctx:
+            FileValidationService.validate(file, "receipt.pdf")
+        self.assertIn("obj", str(ctx.exception).lower())
+
+    def test_pdf_missing_eof(self):
+        pdf_content = b"%PDF-1.4\n" + (b"x" * 150) + b"\n1 0 obj\n<</Type/Catalog>>\nendobj\n"
+        file = SimpleUploadedFile("receipt.pdf", pdf_content, content_type="application/pdf")
+        with self.assertRaises(UnsupportedFileTypeError) as ctx:
+            FileValidationService.validate(file, "receipt.pdf")
+        self.assertIn("eof", str(ctx.exception).lower())
+
+    def test_invalid_jpeg_header(self):
+        file = SimpleUploadedFile("receipt.jpg", b"NOTAJPG" + b"content", content_type="image/jpeg")
+        with self.assertRaises(UnsupportedFileTypeError) as ctx:
+            FileValidationService.validate(file, "receipt.jpg")
+        self.assertIn("jpeg", str(ctx.exception).lower())
+
+    def test_invalid_png_header(self):
+        file = SimpleUploadedFile("receipt.png", b"NOTAPNG" + b"content", content_type="image/png")
+        with self.assertRaises(UnsupportedFileTypeError) as ctx:
+            FileValidationService.validate(file, "receipt.png")
+        self.assertIn("png", str(ctx.exception).lower())
+
     @override_settings(MAX_RECEIPT_UPLOAD_MB=5)
     def test_oversized_file(self):
+        pdf_content = b"%PDF-1.4\n" + (b"x" * (6 * 1024 * 1024))
         file = SimpleUploadedFile(
             "receipt.pdf",
-            b"x" * (6 * 1024 * 1024),
+            pdf_content,
             content_type="application/pdf"
         )
         with self.assertRaises(ReceiptTooLargeError):
@@ -74,7 +145,8 @@ class NormalizationServiceTests(TestCase):
             "extraction": {},
         }
         normalized = NormalizationService.normalize(extracted)
-        self.assertEqual(normalized['merchant']['name'], "abc restaurant pvt ltd")
+        self.assertEqual(normalized['vendor_name'], "ABC RESTAURANT PVT LTD")
+        self.assertEqual(normalized['vendor_normalized'], "abc restaurant pvt ltd")
 
     def test_normalize_date(self):
         extracted = {
@@ -86,7 +158,7 @@ class NormalizationServiceTests(TestCase):
             "extraction": {},
         }
         normalized = NormalizationService.normalize(extracted)
-        self.assertEqual(normalized['invoice']['transaction_date'], "2026-09-01")
+        self.assertEqual(normalized['transaction_date'], "2026-09-01")
 
     def test_normalize_currency(self):
         extracted = {
@@ -98,7 +170,7 @@ class NormalizationServiceTests(TestCase):
             "extraction": {},
         }
         normalized = NormalizationService.normalize(extracted)
-        self.assertEqual(normalized['amounts']['currency'], "INR")
+        self.assertEqual(normalized['currency'], "INR")
 
 
 class DuplicateServiceTests(TestCase):
@@ -119,16 +191,16 @@ class DuplicateServiceTests(TestCase):
             total_amount=Decimal("1000.00"),
             currency="INR",
             normalized_json={
-                "merchant": {"name": "abc restaurant"},
-                "invoice": {
-                    "invoice_number": "inv-001",
-                    "transaction_date": "2026-09-01"
-                },
-                "amounts": {
-                    "total": 1000.00,
-                    "tax": 100.00,
-                    "currency": "INR"
-                },
+                "vendor_name": "ABC Restaurant",
+                "vendor_normalized": "abc restaurant",
+                "invoice_number": "INV-001",
+                "invoice_number_normalized": "inv-001",
+                "transaction_date": "2026-09-01",
+                "subtotal": None,
+                "tax_amount": 100.00,
+                "total_amount": 1000.00,
+                "currency": "INR",
+                "payment_method": None,
             },
         )
 
@@ -149,17 +221,24 @@ class DuplicateServiceTests(TestCase):
             file_size=1000,
             sha256_hash="def456",
             status="UNIQUE",
+            vendor_name="ABC Restaurant",
+            vendor_normalized="abc restaurant",
+            invoice_number="INV-001",
+            invoice_number_normalized="inv-001",
+            transaction_date=date(2026, 9, 1),
+            total_amount=Decimal("1000.00"),
+            currency="INR",
             normalized_json={
-                "merchant": {"name": "abc restaurant"},
-                "invoice": {
-                    "invoice_number": "inv-001",
-                    "transaction_date": "2026-09-01"
-                },
-                "amounts": {
-                    "total": 1000.00,
-                    "tax": 100.00,
-                    "currency": "INR"
-                },
+                "vendor_name": "ABC Restaurant",
+                "vendor_normalized": "abc restaurant",
+                "invoice_number": "INV-001",
+                "invoice_number_normalized": "inv-001",
+                "transaction_date": "2026-09-01",
+                "subtotal": None,
+                "tax_amount": 100.00,
+                "total_amount": 1000.00,
+                "currency": "INR",
+                "payment_method": None,
             },
         )
 

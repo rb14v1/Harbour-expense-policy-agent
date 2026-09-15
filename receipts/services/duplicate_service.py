@@ -28,12 +28,12 @@ class DuplicateService:
             return None
 
         normalized = receipt.normalized_json
-        vendor = normalized.get('merchant', {}).get('name')
-        invoice = normalized.get('invoice', {}).get('invoice_number')
-        date = normalized.get('invoice', {}).get('transaction_date')
-        total = normalized.get('amounts', {}).get('total')
-        tax = normalized.get('amounts', {}).get('tax')
-        currency = normalized.get('amounts', {}).get('currency')
+        vendor = normalized.get('vendor_normalized')
+        invoice = normalized.get('invoice_number_normalized')
+        date = normalized.get('transaction_date')
+        total = normalized.get('total_amount')
+        tax = normalized.get('tax_amount')
+        currency = normalized.get('currency')
 
         existing_receipts = Receipt.objects.filter(
             owner=receipt.owner,
@@ -93,12 +93,12 @@ class DuplicateService:
     ) -> int:
         score = 0
 
-        existing_vendor = existing_normalized.get('merchant', {}).get('name')
-        existing_invoice = existing_normalized.get('invoice', {}).get('invoice_number')
-        existing_date = existing_normalized.get('invoice', {}).get('transaction_date')
-        existing_total = existing_normalized.get('amounts', {}).get('total')
-        existing_tax = existing_normalized.get('amounts', {}).get('tax')
-        existing_currency = existing_normalized.get('amounts', {}).get('currency')
+        existing_vendor = existing_normalized.get('vendor_normalized')
+        existing_invoice = existing_normalized.get('invoice_number_normalized')
+        existing_date = existing_normalized.get('transaction_date')
+        existing_total = existing_normalized.get('total_amount')
+        existing_tax = existing_normalized.get('tax_amount')
+        existing_currency = existing_normalized.get('currency')
 
         if invoice and existing_invoice and invoice == existing_invoice:
             score += DuplicateService.WEIGHTS['invoice_match']
