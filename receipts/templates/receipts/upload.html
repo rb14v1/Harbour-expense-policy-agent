@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Expense Receipt Upload</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: #f5f5f5;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 500px;
+            padding: 40px;
+        }
+
+        h1 {
+            font-size: 24px;
+            margin-bottom: 30px;
+            color: #333;
+            text-align: center;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            font-size: 14px;
+            font-weight: 500;
+            color: #555;
+            margin-bottom: 8px;
+        }
+
+        .file-input-wrapper {
+            position: relative;
+            display: inline-block;
+            width: 100%;
+        }
+
+        input[type="file"] {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        input[type="file"]:focus {
+            outline: none;
+            border-color: #0066cc;
+        }
+
+        .file-name {
+            display: block;
+            margin-top: 8px;
+            font-size: 12px;
+            color: #666;
+        }
+
+        .form-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 30px;
+        }
+
+        button {
+            flex: 1;
+            padding: 12px 20px;
+            font-size: 14px;
+            font-weight: 600;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-upload {
+            background: #0066cc;
+            color: white;
+        }
+
+        .btn-upload:hover:not(:disabled) {
+            background: #0052a3;
+        }
+
+        .btn-upload:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .btn-clear {
+            background: #f0f0f0;
+            color: #333;
+        }
+
+        .btn-clear:hover {
+            background: #e0e0e0;
+        }
+
+        .result-section {
+            margin-top: 30px;
+            padding: 20px;
+            border-radius: 4px;
+            display: none;
+        }
+
+        .result-section.show {
+            display: block;
+        }
+
+        .result-success {
+            background: #f0f9ff;
+            border: 1px solid #0066cc;
+        }
+
+        .result-duplicate {
+            background: #fef3c7;
+            border: 1px solid #f59e0b;
+        }
+
+        .result-error {
+            background: #fef2f2;
+            border: 1px solid #dc2626;
+        }
+
+        .result-title {
+            font-weight: 600;
+            margin-bottom: 12px;
+            font-size: 14px;
+        }
+
+        .result-success .result-title {
+            color: #0066cc;
+        }
+
+        .result-duplicate .result-title {
+            color: #d97706;
+        }
+
+        .result-error .result-title {
+            color: #dc2626;
+        }
+
+        .result-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            font-size: 13px;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        .result-item:last-child {
+            border-bottom: none;
+        }
+
+        .result-label {
+            font-weight: 500;
+            color: #555;
+        }
+
+        .result-value {
+            color: #333;
+            word-break: break-all;
+            text-align: right;
+            flex: 1;
+            margin-left: 10px;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .loading.show {
+            display: block;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #0066cc;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Expense Receipt Upload</h1>
+
+        <form id="uploadForm">
+            <div class="form-group">
+                <label for="receipt-file">Select receipt:</label>
+                <div class="file-input-wrapper">
+                    <input
+                        type="file"
+                        id="receipt-file"
+                        name="file"
+                        accept=".pdf,.jpg,.jpeg,.png"
+                        required
+                    >
+                    <span class="file-name" id="file-name"></span>
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn-upload" id="btn-upload">Upload Receipt</button>
+                <button type="reset" class="btn-clear" id="btn-clear">Clear</button>
+            </div>
+        </form>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p style="margin-top: 10px; font-size: 13px; color: #666;">Processing receipt...</p>
+        </div>
+
+        <div class="result-section" id="result-section">
+            <div class="result-title" id="result-title"></div>
+            <div id="result-content"></div>
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('uploadForm');
+        const fileInput = document.getElementById('receipt-file');
+        const fileNameDisplay = document.getElementById('file-name');
+        const loading = document.getElementById('loading');
+        const resultSection = document.getElementById('result-section');
+        const resultTitle = document.getElementById('result-title');
+        const resultContent = document.getElementById('result-content');
+        const btnUpload = document.getElementById('btn-upload');
+
+        fileInput.addEventListener('change', (e) => {
+            if (fileInput.files.length > 0) {
+                fileNameDisplay.textContent = `Selected: ${fileInput.files[0].name}`;
+            } else {
+                fileNameDisplay.textContent = '';
+            }
+        });
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            if (!fileInput.files.length) {
+                showError('Please select a file');
+                return;
+            }
+
+            const file = fileInput.files[0];
+
+            // Client-side validation
+            const maxSizeBytes = 10 * 1024 * 1024; // 10 MB
+            if (file.size > maxSizeBytes) {
+                showError('File is too large. Maximum size is 10 MB.');
+                return;
+            }
+
+            const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png'];
+            if (!allowedTypes.includes(file.type)) {
+                showError('File type not supported. Please upload PDF, JPG, or PNG.');
+                return;
+            }
+
+            // Upload to API
+            await uploadReceipt(file);
+        });
+
+        async function uploadReceipt(file) {
+            loading.classList.add('show');
+            resultSection.classList.remove('show');
+            btnUpload.disabled = true;
+
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('owner', 'default-user');
+
+                const response = await fetch('/api/v1/receipts/upload/', {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                    }
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    if (data.status === 'EXACT_DUPLICATE') {
+                        showDuplicate(data);
+                    } else {
+                        showSuccess(data);
+                    }
+                } else {
+                    const errorMsg = data.error || data.errors || 'Upload failed';
+                    showError(errorMsg);
+                }
+            } catch (error) {
+                showError(`Network error: ${error.message}`);
+            } finally {
+                loading.classList.remove('show');
+                btnUpload.disabled = false;
+            }
+        }
+
+        function showSuccess(data) {
+            resultSection.classList.add('show');
+            resultSection.className = 'result-section show result-success';
+            resultTitle.textContent = '✓ Receipt uploaded successfully';
+
+            let html = `
+                <div class="result-item">
+                    <span class="result-label">Receipt ID:</span>
+                    <span class="result-value">${escapeHtml(data.receipt_id)}</span>
+                </div>
+                <div class="result-item">
+                    <span class="result-label">Status:</span>
+                    <span class="result-value">${escapeHtml(data.status)}</span>
+                </div>
+                <div class="result-item">
+                    <span class="result-label">Message:</span>
+                    <span class="result-value">${escapeHtml(data.message)}</span>
+                </div>
+            `;
+
+            resultContent.innerHTML = html;
+        }
+
+        function showDuplicate(data) {
+            resultSection.classList.add('show');
+            resultSection.className = 'result-section show result-duplicate';
+            resultTitle.textContent = '⚠ Duplicate detected';
+
+            let html = `
+                <div class="result-item">
+                    <span class="result-label">Receipt ID:</span>
+                    <span class="result-value">${escapeHtml(data.receipt_id)}</span>
+                </div>
+                <div class="result-item">
+                    <span class="result-label">Status:</span>
+                    <span class="result-value">${escapeHtml(data.status)}</span>
+                </div>
+                <div class="result-item">
+                    <span class="result-label">Reason:</span>
+                    <span class="result-value">${escapeHtml(data.message)}</span>
+                </div>
+            `;
+
+            resultContent.innerHTML = html;
+        }
+
+        function showError(message) {
+            resultSection.classList.add('show');
+            resultSection.className = 'result-section show result-error';
+            resultTitle.textContent = '✕ Error';
+
+            let errorText = message;
+            if (typeof message === 'object') {
+                errorText = JSON.stringify(message, null, 2);
+            }
+
+            const html = `
+                <div class="result-item">
+                    <span class="result-label">Error:</span>
+                    <span class="result-value">${escapeHtml(errorText)}</span>
+                </div>
+            `;
+
+            resultContent.innerHTML = html;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>
