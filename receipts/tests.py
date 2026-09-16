@@ -511,3 +511,129 @@ class ReceiptPreviewTests(TestCase):
             self.assertEqual(response.status_code, 404)
             data = response.json()
             self.assertIn('error', data)
+
+    def test_receipt_preview_exact_duplicate_follows_relationship(self):
+        from django.test import Client
+        from unittest.mock import patch
+
+        pdf_content = b"%PDF-1.4\ntest"
+
+        original = Receipt.objects.create(
+            owner="dup-test",
+            original_filename="original.pdf",
+            blob_name="receipts/dup-test/orig/original.pdf",
+            mime_type="application/pdf",
+            file_size=len(pdf_content),
+            sha256_hash="original123",
+            status="APPROVED",
+        )
+
+        duplicate = Receipt.objects.create(
+            owner="dup-test",
+            original_filename="duplicate.pdf",
+            blob_name="",
+            mime_type="application/pdf",
+            file_size=len(pdf_content),
+            sha256_hash="original123",
+            status="EXACT_DUPLICATE",
+            exact_duplicate_of=original,
+        )
+
+        client = Client()
+        with patch('receipts.views.BlobService.download') as mock_download:
+            mock_download.return_value = pdf_content
+            response = client.get(f'/api/v1/receipts/{duplicate.id}/preview/?owner=dup-test')
+
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response['Content-Type'], 'application/pdf')
+            mock_download.assert_called_with('receipts/dup-test/orig/original.pdf')
+
+    def test_receipt_preview_exact_duplicate_unauthorized_original(self):
+        from django.test import Client
+
+        original = Receipt.objects.create(
+            owner="other-owner",
+            original_filename="original.pdf",
+            blob_name="receipts/other-owner/orig/original.pdf",
+            mime_type="application/pdf",
+            file_size=1000,
+            sha256_hash="original123",
+            status="APPROVED",
+        )
+
+        duplicate = Receipt.objects.create(
+            owner="test-owner",
+            original_filename="duplicate.pdf",
+            blob_name="",
+            mime_type="application/pdf",
+            file_size=1000,
+            sha256_hash="original123",
+            status="EXACT_DUPLICATE",
+            exact_duplicate_of=original,
+        )
+
+        client = Client()
+        response = client.get(f'/api/v1/receipts/{duplicate.id}/preview/?owner=test-owner')
+        self.assertEqual(response.status_code, 403)
+
+    def test_receipt_preview_semantic_duplicate_follows_relationship(self):
+        from django.test import Client
+        from unittest.mock import patch
+
+        pdf_content = b"%PDF-1.4\ntest"
+
+        original = Receipt.objects.create(
+            owner="sem-test",
+            original_filename="original.pdf",
+            blob_name="receipts/sem-test/orig/original.pdf",
+            mime_type="application/pdf",
+            file_size=len(pdf_content),
+            sha256_hash="hash1",
+            status="APPROVED",
+        )
+
+        duplicate = Receipt.objects.create(
+            owner="sem-test",
+            original_filename="duplicate.pdf",
+            blob_name="",
+            mime_type="application/pdf",
+            file_size=len(pdf_content),
+            sha256_hash="hash2",
+            status="SEMANTIC_DUPLICATE",
+            semantic_duplicate_of=original,
+            duplicate_score=95,
+        )
+
+        client = Client()
+        with patch('receipts.views.BlobService.download') as mock_download:
+            mock_download.return_value = pdf_content
+            response = client.get(f'/api/v1/receipts/{duplicate.id}/preview/?owner=sem-test')
+
+            self.assertEqual(response.status_code, 200)
+            mock_download.assert_called_with('receipts/sem-test/orig/original.pdf')
+
+    def test_receipt_preview_rejected_with_own_blob(self):
+        from django.test import Client
+        from unittest.mock import patch
+
+        pdf_content = b"%PDF-1.4\ntest"
+
+        receipt = Receipt.objects.create(
+            owner="reject-test",
+            original_filename="receipt.pdf",
+            blob_name="receipts/reject-test/uuid/receipt.pdf",
+            mime_type="application/pdf",
+            file_size=len(pdf_content),
+            sha256_hash="rejecthash",
+            status="REJECTED",
+            processing_message="Receipt rejected because: policy violation",
+        )
+
+        client = Client()
+        with patch('receipts.views.BlobService.download') as mock_download:
+            mock_download.return_value = pdf_content
+            response = client.get(f'/api/v1/receipts/{receipt.id}/preview/?owner=reject-test')
+
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response['Content-Type'], 'application/pdf')
+            mock_download.assert_called_with('receipts/reject-test/uuid/receipt.pdf')

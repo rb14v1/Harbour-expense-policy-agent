@@ -879,6 +879,20 @@
             previewModal.classList.add('show');
 
             try {
+                const detailsResponse = await fetch(`/api/v1/receipts/${receiptId}/?owner=${OWNER}`, {
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                    }
+                });
+
+                let receiptStatus = null;
+                let isDuplicate = false;
+                if (detailsResponse.ok) {
+                    const receipt = await detailsResponse.json();
+                    receiptStatus = receipt.status;
+                    isDuplicate = receipt.status === 'EXACT_DUPLICATE' || receipt.status === 'SEMANTIC_DUPLICATE';
+                }
+
                 const response = await fetch(`/api/v1/receipts/${receiptId}/preview/?owner=${OWNER}`, {
                     headers: {
                         'X-Requested-With': 'XMLHttpRequest',
@@ -889,14 +903,21 @@
                     const contentType = response.headers.get('content-type') || '';
                     const blob = await response.blob();
 
+                    let previewHtml = '';
+                    if (isDuplicate) {
+                        previewHtml = '<div style="background: #fef3c7; border: 1px solid #fde047; padding: 12px; border-radius: 4px; margin-bottom: 15px; color: #92400e; font-size: 13px;"><strong>Note:</strong> This receipt is a duplicate. Showing the original uploaded receipt.</div>';
+                    }
+
                     if (contentType.includes('image/')) {
                         const url = URL.createObjectURL(blob);
-                        previewContent.innerHTML = `<img src="${url}" class="preview-image" />`;
+                        previewHtml += `<img src="${url}" class="preview-image" />`;
+                        previewContent.innerHTML = previewHtml;
                     } else if (contentType.includes('application/pdf')) {
                         const url = URL.createObjectURL(blob);
-                        previewContent.innerHTML = `
+                        previewHtml += `
                             <iframe src="${url}" style="width: 100%; height: 600px; border: none; border-radius: 4px;"></iframe>
                         `;
+                        previewContent.innerHTML = previewHtml;
                     } else {
                         previewContent.innerHTML = '<p>Preview not available for this file type.</p>';
                     }
@@ -951,6 +972,13 @@
         function renderDetails(receipt) {
             const detailsContent = document.getElementById('detailsContent');
 
+            const formatValue = (value, defaultVal = 'N/A') => {
+                if (value === null || value === undefined || value === '') {
+                    return defaultVal;
+                }
+                return value;
+            };
+
             let html = `
                 <div class="detail-item">
                     <div class="detail-label">Status</div>
@@ -958,15 +986,15 @@
                 </div>
                 <div class="detail-item">
                     <div class="detail-label">Filename</div>
-                    <div class="detail-value">${escapeHtml(receipt.original_filename)}</div>
+                    <div class="detail-value">${escapeHtml(formatValue(receipt.original_filename))}</div>
                 </div>
                 <div class="detail-item">
                     <div class="detail-label">Category</div>
-                    <div class="detail-value">${escapeHtml(receipt.category)}</div>
+                    <div class="detail-value">${escapeHtml(formatValue(receipt.category))}</div>
                 </div>
                 <div class="detail-item">
                     <div class="detail-label">Vendor</div>
-                    <div class="detail-value">${escapeHtml(receipt.vendor_name || 'N/A')}</div>
+                    <div class="detail-value">${escapeHtml(formatValue(receipt.vendor_name))}</div>
                 </div>
                 <div class="detail-item">
                     <div class="detail-label">Transaction Date</div>
@@ -974,15 +1002,15 @@
                 </div>
                 <div class="detail-item">
                     <div class="detail-label">Total Amount</div>
-                    <div class="detail-value">${receipt.currency || ''} ${receipt.total_amount || 'N/A'}</div>
+                    <div class="detail-value">${formatValue(receipt.currency ? receipt.currency + ' ' + receipt.total_amount : receipt.total_amount)}</div>
                 </div>
                 <div class="detail-item">
                     <div class="detail-label">Invoice Number</div>
-                    <div class="detail-value">${escapeHtml(receipt.invoice_number || 'N/A')}</div>
+                    <div class="detail-value">${escapeHtml(formatValue(receipt.invoice_number))}</div>
                 </div>
                 <div class="detail-item">
                     <div class="detail-label">Payment Method</div>
-                    <div class="detail-value">${escapeHtml(receipt.payment_method || 'N/A')}</div>
+                    <div class="detail-value">${escapeHtml(formatValue(receipt.payment_method))}</div>
                 </div>
             `;
 
@@ -1025,7 +1053,11 @@
             html += `
                 <div class="detail-item">
                     <div class="detail-label">Created</div>
-                    <div class="detail-value">${formatDate(receipt.created_at)}</div>
+                    <div class="detail-value">${receipt.created_at ? formatDate(receipt.created_at) : 'N/A'}</div>
+                </div>
+                <div class="detail-item">
+                    <div class="detail-label">Updated</div>
+                    <div class="detail-value">${receipt.updated_at ? formatDate(receipt.updated_at) : 'N/A'}</div>
                 </div>
             `;
 

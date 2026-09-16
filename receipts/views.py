@@ -30,7 +30,7 @@ class ReceiptViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_serializer_class(self):
         if self.action == 'retrieve':
-            return ReceiptStatusSerializer
+            return ReceiptDetailSerializer
         elif self.action == 'list':
             return ReceiptListSerializer
         return ReceiptDetailSerializer
@@ -141,23 +141,48 @@ class ReceiptViewSet(viewsets.ReadOnlyModelViewSet):
                 status=status.HTTP_403_FORBIDDEN
             )
 
+        preview_receipt = receipt
+
         if not receipt.blob_name:
+            if receipt.status == 'EXACT_DUPLICATE' and receipt.exact_duplicate_of:
+                original = receipt.exact_duplicate_of
+                if original.owner != owner:
+                    return Response(
+                        {'error': 'Unauthorized'},
+                        status=status.HTTP_403_FORBIDDEN
+                    )
+                preview_receipt = original
+            elif receipt.status == 'SEMANTIC_DUPLICATE' and receipt.semantic_duplicate_of:
+                original = receipt.semantic_duplicate_of
+                if original.owner != owner:
+                    return Response(
+                        {'error': 'Unauthorized'},
+                        status=status.HTTP_403_FORBIDDEN
+                    )
+                preview_receipt = original
+            else:
+                return Response(
+                    {'error': 'Unable to preview this receipt because the original file is no longer available'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+
+        if not preview_receipt.blob_name:
             return Response(
-                {'error': 'Receipt file not found'},
+                {'error': 'Unable to preview this receipt because the original file is no longer available'},
                 status=status.HTTP_404_NOT_FOUND
             )
 
         blob_service = BlobService()
         try:
-            file_bytes = blob_service.download(receipt.blob_name)
+            file_bytes = blob_service.download(preview_receipt.blob_name)
         except BlobUploadError as e:
-            logger.error(f"Failed to download blob {receipt.blob_name}: {str(e)}")
+            logger.error(f"Failed to download blob {preview_receipt.blob_name}: {str(e)}")
             return Response(
-                {'error': 'Unable to retrieve the receipt file'},
+                {'error': 'Unable to preview this receipt because the original file is no longer available'},
                 status=status.HTTP_404_NOT_FOUND
             )
         except Exception as e:
-            logger.error(f"Unexpected error downloading blob {receipt.blob_name}: {str(e)}")
+            logger.error(f"Unexpected error downloading blob {preview_receipt.blob_name}: {str(e)}")
             return Response(
                 {'error': 'Unable to retrieve the receipt file'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
@@ -165,10 +190,10 @@ class ReceiptViewSet(viewsets.ReadOnlyModelViewSet):
 
         response = FileResponse(
             iter([file_bytes]),
-            content_type=receipt.mime_type,
+            content_type=preview_receipt.mime_type,
             as_attachment=False
         )
-        response['Content-Disposition'] = f'inline; filename="{receipt.original_filename}"'
+        response['Content-Disposition'] = f'inline; filename="{preview_receipt.original_filename}"'
         return response
 
 
