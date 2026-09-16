@@ -22,6 +22,18 @@ class Receipt(models.Model):
         ('FAILED', 'Failed'),
     ]
 
+    CATEGORY_CHOICES = [
+        ('Accommodation', 'Accommodation'),
+        ('Meals', 'Meals'),
+        ('Travel', 'Travel'),
+        ('Transportation', 'Transportation'),
+        ('Car Rental', 'Car Rental'),
+        ('Fuel', 'Fuel'),
+        ('Client Entertainment', 'Client Entertainment'),
+        ('Office Supplies', 'Office Supplies'),
+        ('Other', 'Other'),
+    ]
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     owner = models.CharField(max_length=255, default='default-user')
 
@@ -43,6 +55,7 @@ class Receipt(models.Model):
     total_amount = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, db_index=True)
     currency = models.CharField(max_length=3, null=True, blank=True, db_index=True)
     payment_method = models.CharField(max_length=255, null=True, blank=True)
+    category = models.CharField(max_length=50, choices=CATEGORY_CHOICES, default='Other', db_index=True)
 
     normalized_json = models.JSONField(null=True, blank=True)
     raw_document_intelligence_json = models.JSONField(null=True, blank=True)
@@ -63,6 +76,8 @@ class Receipt(models.Model):
     )
     duplicate_score = models.IntegerField(null=True, blank=True)
     duplicate_reason = models.TextField(null=True, blank=True)
+
+    processing_message = models.TextField(null=True, blank=True)
 
     policy_status = models.CharField(max_length=50, null=True, blank=True)
     policy_result_json = models.JSONField(null=True, blank=True)
@@ -88,6 +103,7 @@ class Receipt(models.Model):
         self.status = 'EXACT_DUPLICATE'
         self.exact_duplicate_of = original_receipt
         self.duplicate_reason = "Same file content was already uploaded."
+        self.processing_message = "This receipt has already been uploaded."
         self.save()
 
     def mark_semantic_duplicate(self, original_receipt, score, reason):
@@ -95,6 +111,7 @@ class Receipt(models.Model):
         self.semantic_duplicate_of = original_receipt
         self.duplicate_score = score
         self.duplicate_reason = reason
+        self.processing_message = "This receipt appears to duplicate a previously uploaded receipt."
         self.save()
 
     def mark_unique(self):

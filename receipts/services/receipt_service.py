@@ -57,6 +57,7 @@ class ReceiptService:
         except BlobUploadError as e:
             receipt.status = "FAILED"
             receipt.duplicate_reason = f"Blob upload failed: {str(e)}"
+            receipt.processing_message = "Unable to store the receipt file. Please try uploading again."
             receipt.save()
             raise
 
@@ -84,12 +85,14 @@ class ReceiptService:
             if self._is_ocr_result_blank(extracted):
                 receipt.status = "FAILED"
                 receipt.duplicate_reason = "Receipt appears to be blank. No meaningful content was extracted."
+                receipt.processing_message = "The uploaded receipt appears to be blank. Please upload a receipt with visible content."
                 receipt.save()
                 return receipt
 
             if not self._is_valid_receipt(extracted):
                 receipt.status = "FAILED"
                 receipt.duplicate_reason = "Document does not appear to be a receipt. Required receipt information is missing."
+                receipt.processing_message = "The uploaded document does not appear to be a valid receipt. A valid receipt must contain a vendor name, total amount, and at least one additional receipt indicator such as date, invoice number, payment method, or line items."
                 receipt.save()
                 return receipt
 
@@ -103,6 +106,8 @@ class ReceiptService:
 
             receipt.normalized_json = normalized
             receipt.status = "NORMALIZED"
+
+            receipt.category = self.determine_category(extracted)
 
             # Populate Receipt model from normalized data
             if normalized.get('vendor_name'):
@@ -167,16 +172,53 @@ class ReceiptService:
 
             if policy_result['status'] == 'APPROVED':
                 receipt.status = 'APPROVED'
+                receipt.processing_message = "Receipt has been validated and approved."
             else:
                 receipt.status = 'REJECTED'
+                rejection_reasons = []
+                for rule in policy_result.get('rules', []):
+                    if not rule.get('passed'):
+                        rejection_reasons.append(rule.get('message', 'Policy rule violation'))
+                receipt.processing_message = f"Receipt rejected because: {'; '.join(rejection_reasons)}" if rejection_reasons else "Receipt failed policy validation."
 
             receipt.save()
 
         except Exception as e:
-            receipt.mark_ocr_failed(str(e))
+            error_msg = str(e)
+            receipt.mark_ocr_failed(error_msg)
+            receipt.processing_message = "Unable to process the receipt. Please try again."
+            receipt.save()
             raise
 
         return receipt
+
+    @staticmethod
+    def determine_category(extracted: dict) -> str:
+        """Determine receipt category based on extracted data."""
+        if not extracted:
+            return 'Other'
+
+        merchant_name = extracted.get('merchant', {}).get('name', '').lower()
+        line_items_desc = ' '.join([str(item.get('description', '')).lower() for item in extracted.get('line_items', [])]) if extracted.get('line_items') else ''
+        all_text = merchant_name + ' ' + line_items_desc
+
+        category_keywords = {
+            'Accommodation': ['hotel', 'motel', 'resort', 'airbnb', 'hostel', 'lodging', 'inn'],
+            'Meals': ['restaurant', 'cafe', 'coffee', 'food', 'lunch', 'dinner', 'breakfast', 'bistro', 'pizzeria', 'bakery'],
+            'Travel': ['airline', 'flight', 'train', 'railway', 'ticket'],
+            'Transportation': ['taxi', 'uber', 'lyft', 'bus', 'metro', 'parking', 'toll'],
+            'Car Rental': ['rental', 'hertz', 'enterprise', 'avis', 'car rental'],
+            'Fuel': ['gas station', 'petrol', 'fuel', 'diesel', 'shell', 'bp', 'exxon'],
+            'Client Entertainment': ['entertainment', 'movie', 'cinema', 'bar', 'lounge', 'night club'],
+            'Office Supplies': ['office', 'stationery', 'supplies', 'paper', 'pen', 'ink'],
+        }
+
+        for category, keywords in category_keywords.items():
+            for keyword in keywords:
+                if keyword in all_text:
+                    return category
+
+        return 'Other'
 
     @staticmethod
     def _is_valid_receipt(extracted: dict) -> bool:

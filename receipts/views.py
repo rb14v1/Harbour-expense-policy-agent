@@ -2,6 +2,7 @@ from rest_framework import viewsets, status, parsers
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.shortcuts import render
+from django.http import FileResponse, Http404
 from receipts.models import Receipt
 from receipts.serializers import (
     ReceiptDetailSerializer,
@@ -10,7 +11,8 @@ from receipts.serializers import (
     ReceiptUploadSerializer,
 )
 from receipts.tasks import process_receipt_task, process_receipt_task_sync
-from receipts.exceptions import ReceiptAppException
+from receipts.exceptions import ReceiptAppException, BlobUploadError
+from receipts.services.blob_service import BlobService
 import logging
 
 logger = logging.getLogger(__name__)
@@ -35,7 +37,32 @@ class ReceiptViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_queryset(self):
         owner = self.request.query_params.get('owner', 'default-user')
-        return Receipt.objects.filter(owner=owner)
+        queryset = Receipt.objects.all().order_by('-created_at')
+
+        if self.action != 'preview':
+            queryset = queryset.filter(owner=owner)
+
+            status_filter = self.request.query_params.get('status')
+            if status_filter:
+                queryset = queryset.filter(status=status_filter)
+
+            category_filter = self.request.query_params.get('category')
+            if category_filter:
+                queryset = queryset.filter(category=category_filter)
+
+            vendor_filter = self.request.query_params.get('vendor')
+            if vendor_filter:
+                queryset = queryset.filter(vendor_name__icontains=vendor_filter)
+
+            date_from = self.request.query_params.get('date_from')
+            if date_from:
+                queryset = queryset.filter(transaction_date__gte=date_from)
+
+            date_to = self.request.query_params.get('date_to')
+            if date_to:
+                queryset = queryset.filter(transaction_date__lte=date_to)
+
+        return queryset
 
     @action(detail=False, methods=['post'], parser_classes=(parsers.MultiPartParser,))
     def upload(self, request):
@@ -102,6 +129,47 @@ class ReceiptViewSet(viewsets.ReadOnlyModelViewSet):
         receipt = self.get_object()
         serializer = ReceiptDetailSerializer(receipt)
         return Response(serializer.data)
+
+    @action(detail=True, methods=['get'])
+    def preview(self, request, pk=None):
+        receipt = self.get_object()
+        owner = request.query_params.get('owner', 'default-user')
+
+        if receipt.owner != owner:
+            return Response(
+                {'error': 'Unauthorized'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        if not receipt.blob_name:
+            return Response(
+                {'error': 'Receipt file not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        blob_service = BlobService()
+        try:
+            file_bytes = blob_service.download(receipt.blob_name)
+        except BlobUploadError as e:
+            logger.error(f"Failed to download blob {receipt.blob_name}: {str(e)}")
+            return Response(
+                {'error': 'Unable to retrieve the receipt file'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            logger.error(f"Unexpected error downloading blob {receipt.blob_name}: {str(e)}")
+            return Response(
+                {'error': 'Unable to retrieve the receipt file'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+        response = FileResponse(
+            iter([file_bytes]),
+            content_type=receipt.mime_type,
+            as_attachment=False
+        )
+        response['Content-Disposition'] = f'inline; filename="{receipt.original_filename}"'
+        return response
 
 
 def upload_form_view(request):

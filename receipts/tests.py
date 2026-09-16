@@ -276,3 +276,185 @@ class PolicyServiceTests(TestCase):
         result = PolicyService.evaluate(receipt)
         self.assertEqual(result['status'], 'REJECTED')
         self.assertFalse(result['rules'][0]['passed'])
+
+
+class ReceiptListSerializerTests(TestCase):
+    def test_receipt_list_includes_category(self):
+        receipt = Receipt.objects.create(
+            owner="user1",
+            original_filename="receipt.pdf",
+            blob_name="receipts/user1/uuid/receipt.pdf",
+            mime_type="application/pdf",
+            file_size=1000,
+            sha256_hash="abc123",
+            category="Meals",
+        )
+        from receipts.serializers import ReceiptListSerializer
+        serializer = ReceiptListSerializer(receipt)
+        self.assertIn('category', serializer.data)
+        self.assertEqual(serializer.data['category'], 'Meals')
+
+    def test_receipt_list_includes_processing_message(self):
+        receipt = Receipt.objects.create(
+            owner="user1",
+            original_filename="receipt.pdf",
+            blob_name="receipts/user1/uuid/receipt.pdf",
+            mime_type="application/pdf",
+            file_size=1000,
+            sha256_hash="abc123",
+            processing_message="Receipt has been validated and approved.",
+        )
+        from receipts.serializers import ReceiptListSerializer
+        serializer = ReceiptListSerializer(receipt)
+        self.assertIn('processing_message', serializer.data)
+        self.assertEqual(serializer.data['processing_message'], 'Receipt has been validated and approved.')
+
+    def test_receipt_detail_includes_all_fields(self):
+        receipt = Receipt.objects.create(
+            owner="user1",
+            original_filename="receipt.pdf",
+            blob_name="receipts/user1/uuid/receipt.pdf",
+            mime_type="application/pdf",
+            file_size=1000,
+            sha256_hash="abc123",
+            vendor_name="Test Vendor",
+            category="Travel",
+            processing_message="Test message",
+            duplicate_reason="Test duplicate reason",
+        )
+        from receipts.serializers import ReceiptDetailSerializer
+        serializer = ReceiptDetailSerializer(receipt)
+        data = serializer.data
+        self.assertIn('category', data)
+        self.assertIn('processing_message', data)
+        self.assertIn('duplicate_reason', data)
+        self.assertEqual(data['category'], 'Travel')
+
+
+class ReceiptPreviewTests(TestCase):
+    def setUp(self):
+        Receipt.objects.all().delete()
+        self.pdf_content = (
+            b"%PDF-1.4\n"
+            b"%\xE2\xE3\xCF\xD3\n"
+            b"1 0 obj\n"
+            b"<</Type/Catalog/Pages 2 0 R>>\n"
+            b"endobj\n"
+            b"2 0 obj\n"
+            b"<</Type/Pages/Kids[3 0 R]/Count 1>>\n"
+            b"endobj\n"
+            b"3 0 obj\n"
+            b"<</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]>>\n"
+            b"endobj\n"
+            b"xref\n"
+            b"0 4\n"
+            b"0000000000 65535 f\n"
+            b"0000000009 00000 n\n"
+            b"0000000074 00000 n\n"
+            b"0000000133 00000 n\n"
+            b"trailer\n"
+            b"<</Size 4/Root 1 0 R>>\n"
+            b"startxref\n"
+            b"190\n"
+            b"%%EOF"
+        )
+
+    def test_receipt_list_filtering_by_status(self):
+        from django.test import Client
+        Receipt.objects.filter(owner="test-filter-status").delete()
+
+        receipt1 = Receipt.objects.create(
+            owner="test-filter-status",
+            original_filename="receipt1.pdf",
+            blob_name="receipts/test-filter-status/uuid1/receipt1.pdf",
+            mime_type="application/pdf",
+            file_size=1000,
+            sha256_hash="hash-status-1",
+            status="APPROVED",
+        )
+        receipt2 = Receipt.objects.create(
+            owner="test-filter-status",
+            original_filename="receipt2.pdf",
+            blob_name="receipts/test-filter-status/uuid2/receipt2.pdf",
+            mime_type="application/pdf",
+            file_size=1000,
+            sha256_hash="hash-status-2",
+            status="REJECTED",
+        )
+
+        client = Client()
+        response = client.get('/api/v1/receipts/?owner=test-filter-status&status=APPROVED')
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        results = data['results'] if isinstance(data, dict) and 'results' in data else data
+        approved_count = len([r for r in results if r['status'] == 'APPROVED'])
+        self.assertGreaterEqual(approved_count, 1)
+        self.assertTrue(any(r['status'] == 'APPROVED' for r in results))
+
+    def test_receipt_list_filtering_by_category(self):
+        from django.test import Client
+        Receipt.objects.filter(owner="test-filter-category").delete()
+
+        receipt1 = Receipt.objects.create(
+            owner="test-filter-category",
+            original_filename="receipt1.pdf",
+            blob_name="receipts/test-filter-category/uuid1/receipt1.pdf",
+            mime_type="application/pdf",
+            file_size=1000,
+            sha256_hash="hash-cat-1",
+            category="Meals",
+        )
+        receipt2 = Receipt.objects.create(
+            owner="test-filter-category",
+            original_filename="receipt2.pdf",
+            blob_name="receipts/test-filter-category/uuid2/receipt2.pdf",
+            mime_type="application/pdf",
+            file_size=1000,
+            sha256_hash="hash-cat-2",
+            category="Travel",
+        )
+
+        client = Client()
+        response = client.get('/api/v1/receipts/?owner=test-filter-category&category=Meals')
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        results = data['results'] if isinstance(data, dict) and 'results' in data else data
+        meals_count = len([r for r in results if r['category'] == 'Meals'])
+        self.assertGreaterEqual(meals_count, 1)
+        self.assertTrue(any(r['category'] == 'Meals' for r in results))
+
+    def test_receipt_preview_missing_receipt_returns_404(self):
+        from django.test import Client
+        client = Client()
+        response = client.get('/api/v1/receipts/00000000-0000-0000-0000-000000000000/preview/?owner=default-user')
+        self.assertEqual(response.status_code, 404)
+
+    def test_receipt_preview_unauthorized_access(self):
+        from django.test import Client
+        receipt = Receipt.objects.create(
+            owner="other-user",
+            original_filename="receipt.pdf",
+            blob_name="receipts/other-user/uuid/receipt.pdf",
+            mime_type="application/pdf",
+            file_size=1000,
+            sha256_hash="abc123",
+        )
+
+        client = Client()
+        response = client.get(f'/api/v1/receipts/{receipt.id}/preview/?owner=default-user')
+        self.assertEqual(response.status_code, 403)
+
+    def test_receipt_preview_no_blob_returns_404(self):
+        from django.test import Client
+        receipt = Receipt.objects.create(
+            owner="default-user",
+            original_filename="receipt.pdf",
+            blob_name="",
+            mime_type="application/pdf",
+            file_size=1000,
+            sha256_hash="abc123",
+        )
+
+        client = Client()
+        response = client.get(f'/api/v1/receipts/{receipt.id}/preview/?owner=default-user')
+        self.assertEqual(response.status_code, 404)

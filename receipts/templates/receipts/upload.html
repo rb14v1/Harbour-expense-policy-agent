@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Expense Receipt Upload</title>
+    <title>Expense Receipt Management</title>
     <style>
         * {
             margin: 0;
@@ -14,27 +14,60 @@
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
             background: #f5f5f5;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
             padding: 20px;
         }
 
-        .container {
+        .app-container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
             background: white;
+            padding: 30px;
             border-radius: 8px;
+            margin-bottom: 30px;
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-            width: 100%;
-            max-width: 500px;
-            padding: 40px;
         }
 
         h1 {
-            font-size: 24px;
-            margin-bottom: 30px;
+            font-size: 28px;
             color: #333;
-            text-align: center;
+            margin-bottom: 8px;
+        }
+
+        .subtitle {
+            font-size: 14px;
+            color: #666;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            padding: 30px;
+        }
+
+        .card-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: #333;
+            border-bottom: 2px solid #f0f0f0;
+            padding-bottom: 12px;
         }
 
         .form-group {
@@ -47,12 +80,6 @@
             font-weight: 500;
             color: #555;
             margin-bottom: 8px;
-        }
-
-        .file-input-wrapper {
-            position: relative;
-            display: inline-block;
-            width: 100%;
         }
 
         input[type="file"] {
@@ -69,17 +96,21 @@
             border-color: #0066cc;
         }
 
-        .file-name {
-            display: block;
+        .file-info {
             margin-top: 8px;
             font-size: 12px;
             color: #666;
         }
 
+        .max-size {
+            color: #999;
+            font-style: italic;
+        }
+
         .form-actions {
             display: flex;
             gap: 10px;
-            margin-top: 30px;
+            margin-top: 25px;
         }
 
         button {
@@ -93,96 +124,47 @@
             transition: all 0.2s;
         }
 
-        .btn-upload {
+        .btn-primary {
             background: #0066cc;
             color: white;
         }
 
-        .btn-upload:hover:not(:disabled) {
+        .btn-primary:hover:not(:disabled) {
             background: #0052a3;
         }
 
-        .btn-upload:disabled {
+        .btn-primary:disabled {
             background: #ccc;
             cursor: not-allowed;
         }
 
-        .btn-clear {
+        .btn-secondary {
             background: #f0f0f0;
             color: #333;
         }
 
-        .btn-clear:hover {
+        .btn-secondary:hover {
             background: #e0e0e0;
         }
 
-        .result-section {
-            margin-top: 30px;
-            padding: 20px;
-            border-radius: 4px;
-            display: none;
+        .btn-small {
+            padding: 6px 12px;
+            font-size: 12px;
+            width: auto;
+            flex: none;
         }
 
-        .result-section.show {
-            display: block;
-        }
-
-        .result-success {
-            background: #f0f9ff;
-            border: 1px solid #0066cc;
-        }
-
-        .result-duplicate {
-            background: #fef3c7;
-            border: 1px solid #f59e0b;
-        }
-
-        .result-error {
-            background: #fef2f2;
-            border: 1px solid #dc2626;
-        }
-
-        .result-title {
-            font-weight: 600;
-            margin-bottom: 12px;
-            font-size: 14px;
-        }
-
-        .result-success .result-title {
-            color: #0066cc;
-        }
-
-        .result-duplicate .result-title {
-            color: #d97706;
-        }
-
-        .result-error .result-title {
-            color: #dc2626;
-        }
-
-        .result-item {
-            display: flex;
-            justify-content: space-between;
-            padding: 8px 0;
-            font-size: 13px;
-            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
-        }
-
-        .result-item:last-child {
-            border-bottom: none;
-        }
-
-        .result-label {
-            font-weight: 500;
-            color: #555;
-        }
-
-        .result-value {
+        .btn-preview {
+            background: #f0f0f0;
             color: #333;
-            word-break: break-all;
-            text-align: right;
-            flex: 1;
-            margin-left: 10px;
+            padding: 6px 10px;
+            font-size: 12px;
+            border-radius: 3px;
+            width: auto;
+        }
+
+        .btn-preview:hover {
+            background: #e0e0e0;
         }
 
         .loading {
@@ -197,10 +179,10 @@
 
         .spinner {
             display: inline-block;
-            width: 16px;
-            height: 16px;
-            border: 2px solid #f3f3f3;
-            border-top: 2px solid #0066cc;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #0066cc;
             border-radius: 50%;
             animation: spin 1s linear infinite;
         }
@@ -209,45 +191,425 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+
+        .result-section {
+            margin-top: 25px;
+            padding: 20px;
+            border-radius: 4px;
+            display: none;
+        }
+
+        .result-section.show {
+            display: block;
+        }
+
+        .result-success {
+            background: #f0fdf4;
+            border: 1px solid #86efac;
+            color: #166534;
+        }
+
+        .result-approved {
+            background: #f0fdf4;
+            border: 1px solid #86efac;
+            color: #166534;
+        }
+
+        .result-rejected {
+            background: #fef2f2;
+            border: 1px solid #fca5a5;
+            color: #991b1b;
+        }
+
+        .result-duplicate {
+            background: #fef3c7;
+            border: 1px solid #fde047;
+            color: #92400e;
+        }
+
+        .result-failed {
+            background: #fef2f2;
+            border: 1px solid #fca5a5;
+            color: #991b1b;
+        }
+
+        .result-processing {
+            background: #eff6ff;
+            border: 1px solid #93c5fd;
+            color: #1e40af;
+        }
+
+        .result-title {
+            font-weight: 600;
+            margin-bottom: 12px;
+            font-size: 14px;
+        }
+
+        .result-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            font-size: 13px;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+        }
+
+        .result-item:last-child {
+            border-bottom: none;
+        }
+
+        .result-label {
+            font-weight: 500;
+        }
+
+        .result-value {
+            word-break: break-all;
+            text-align: right;
+            flex: 1;
+            margin-left: 10px;
+        }
+
+        .receipt-history-container {
+            grid-column: 1 / -1;
+        }
+
+        .history-filters {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .filter-group {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .filter-group label {
+            margin: 0;
+            font-size: 12px;
+        }
+
+        .filter-group select {
+            padding: 6px 8px;
+            font-size: 12px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+        }
+
+        .receipt-list {
+            display: grid;
+            gap: 15px;
+        }
+
+        .receipt-card {
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            hover-bg: #f9f9f9;
+            transition: background 0.2s;
+        }
+
+        .receipt-card:hover {
+            background: #f9f9f9;
+        }
+
+        .receipt-info {
+            flex: 1;
+        }
+
+        .receipt-filename {
+            font-weight: 500;
+            color: #333;
+            margin-bottom: 4px;
+            font-size: 13px;
+        }
+
+        .receipt-meta {
+            font-size: 12px;
+            color: #666;
+            display: flex;
+            gap: 20px;
+        }
+
+        .receipt-meta-item {
+            display: flex;
+            gap: 4px;
+        }
+
+        .receipt-meta-label {
+            font-weight: 500;
+            color: #555;
+        }
+
+        .receipt-status-badge {
+            padding: 4px 8px;
+            border-radius: 3px;
+            font-size: 11px;
+            font-weight: 600;
+            margin-right: 10px;
+        }
+
+        .status-uploaded {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .status-processing {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .status-approved {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .status-rejected {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .status-duplicate {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .status-failed {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .receipt-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #999;
+        }
+
+        .empty-state-icon {
+            font-size: 40px;
+            margin-bottom: 12px;
+        }
+
+        /* Modal styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            overflow: auto;
+        }
+
+        .modal.show {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+            width: 90%;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #f0f0f0;
+            padding-bottom: 15px;
+        }
+
+        .modal-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            color: #999;
+            cursor: pointer;
+            padding: 0;
+        }
+
+        .modal-close:hover {
+            color: #333;
+        }
+
+        .detail-item {
+            margin-bottom: 15px;
+            border-bottom: 1px solid #f0f0f0;
+            padding-bottom: 12px;
+        }
+
+        .detail-item:last-child {
+            border-bottom: none;
+        }
+
+        .detail-label {
+            font-weight: 600;
+            color: #555;
+            font-size: 12px;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+
+        .detail-value {
+            color: #333;
+            font-size: 14px;
+            word-break: break-word;
+        }
+
+        .preview-modal-content {
+            max-width: 800px;
+        }
+
+        .preview-image {
+            max-width: 100%;
+            height: auto;
+            border-radius: 4px;
+        }
+
+        .loading-state {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Expense Receipt Upload</h1>
+    <div class="app-container">
+        <div class="header">
+            <h1>Expense Receipt Management</h1>
+            <p class="subtitle">Upload and manage your expense receipts</p>
+        </div>
 
-        <form id="uploadForm">
-            <div class="form-group">
-                <label for="receipt-file">Select receipt:</label>
-                <div class="file-input-wrapper">
-                    <input
-                        type="file"
-                        id="receipt-file"
-                        name="file"
-                        accept=".pdf,.jpg,.jpeg,.png"
-                        required
-                    >
-                    <span class="file-name" id="file-name"></span>
+        <div class="main-content">
+            <!-- Upload Card -->
+            <div class="card">
+                <div class="card-title">Upload Receipt</div>
+
+                <form id="uploadForm">
+                    <div class="form-group">
+                        <label for="receipt-file">Select receipt file:</label>
+                        <div>
+                            <input
+                                type="file"
+                                id="receipt-file"
+                                name="file"
+                                accept=".pdf,.jpg,.jpeg,.png"
+                                required
+                            >
+                            <div class="file-info" id="file-name"></div>
+                            <div class="file-info max-size">Maximum size: 20 MB</div>
+                        </div>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="submit" class="btn-primary" id="btn-upload">Upload Receipt</button>
+                        <button type="reset" class="btn-secondary" id="btn-clear">Clear</button>
+                    </div>
+                </form>
+
+                <div class="loading" id="loading">
+                    <div class="spinner"></div>
+                    <p style="margin-top: 10px; font-size: 13px; color: #666;">Processing receipt...</p>
+                </div>
+
+                <div class="result-section" id="result-section">
+                    <div class="result-title" id="result-title"></div>
+                    <div id="result-content"></div>
                 </div>
             </div>
 
-            <div class="form-actions">
-                <button type="submit" class="btn-upload" id="btn-upload">Upload Receipt</button>
-                <button type="reset" class="btn-clear" id="btn-clear">Clear</button>
+            <!-- History Card -->
+            <div class="card">
+                <div class="card-title">Receipt History</div>
+
+                <div class="history-filters">
+                    <div class="filter-group">
+                        <label for="filter-status">Status:</label>
+                        <select id="filter-status">
+                            <option value="">All</option>
+                            <option value="APPROVED">Approved</option>
+                            <option value="REJECTED">Rejected</option>
+                            <option value="UPLOADED">Uploaded</option>
+                            <option value="EXACT_DUPLICATE">Duplicate</option>
+                            <option value="FAILED">Failed</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label for="filter-category">Category:</label>
+                        <select id="filter-category">
+                            <option value="">All</option>
+                            <option value="Accommodation">Accommodation</option>
+                            <option value="Meals">Meals</option>
+                            <option value="Travel">Travel</option>
+                            <option value="Transportation">Transportation</option>
+                            <option value="Car Rental">Car Rental</option>
+                            <option value="Fuel">Fuel</option>
+                            <option value="Client Entertainment">Client Entertainment</option>
+                            <option value="Office Supplies">Office Supplies</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="receipt-list" id="receipt-list">
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📋</div>
+                        <p>No receipts uploaded yet</p>
+                    </div>
+                </div>
             </div>
-        </form>
-
-        <div class="loading" id="loading">
-            <div class="spinner"></div>
-            <p style="margin-top: 10px; font-size: 13px; color: #666;">Processing receipt...</p>
         </div>
+    </div>
 
-        <div class="result-section" id="result-section">
-            <div class="result-title" id="result-title"></div>
-            <div id="result-content"></div>
+    <!-- Details Modal -->
+    <div id="detailsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Receipt Details</h2>
+                <button class="modal-close" onclick="closeDetailsModal()">&times;</button>
+            </div>
+            <div id="detailsContent"></div>
+        </div>
+    </div>
+
+    <!-- Preview Modal -->
+    <div id="previewModal" class="modal">
+        <div class="modal-content preview-modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Receipt Preview</h2>
+                <button class="modal-close" onclick="closePreviewModal()">&times;</button>
+            </div>
+            <div id="previewContent"></div>
         </div>
     </div>
 
     <script>
+        const OWNER = 'default-user';
         const form = document.getElementById('uploadForm');
         const fileInput = document.getElementById('receipt-file');
         const fileNameDisplay = document.getElementById('file-name');
@@ -256,15 +618,22 @@
         const resultTitle = document.getElementById('result-title');
         const resultContent = document.getElementById('result-content');
         const btnUpload = document.getElementById('btn-upload');
+        const filterStatus = document.getElementById('filter-status');
+        const filterCategory = document.getElementById('filter-category');
+        const receiptList = document.getElementById('receipt-list');
 
+        // File input change handler
         fileInput.addEventListener('change', (e) => {
             if (fileInput.files.length > 0) {
-                fileNameDisplay.textContent = `Selected: ${fileInput.files[0].name}`;
+                const file = fileInput.files[0];
+                const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
+                fileNameDisplay.textContent = `Selected: ${escapeHtml(file.name)} (${sizeMB} MB)`;
             } else {
                 fileNameDisplay.textContent = '';
             }
         });
 
+        // Clear button
         document.getElementById('btn-clear').addEventListener('click', (e) => {
             e.preventDefault();
             fileInput.value = '';
@@ -277,33 +646,34 @@
             btnUpload.disabled = false;
         });
 
+        // Upload form submission
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
 
             if (!fileInput.files.length) {
-                showError('Please select a file');
+                showUploadError('Please select a file');
                 return;
             }
 
             const file = fileInput.files[0];
 
             // Client-side validation
-            const maxSizeBytes = 10 * 1024 * 1024; // 10 MB
+            const maxSizeBytes = 20 * 1024 * 1024;
             if (file.size > maxSizeBytes) {
-                showError('File is too large. Maximum size is 10 MB.');
+                showUploadError('File size exceeds the maximum allowed size of 20 MB.');
                 return;
             }
 
             const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png'];
             if (!allowedTypes.includes(file.type)) {
-                showError('File type not supported. Please upload PDF, JPG, or PNG.');
+                showUploadError('File type not supported. Please upload PDF, JPG, or PNG.');
                 return;
             }
 
-            // Upload to API
             await uploadReceipt(file);
         });
 
+        // Upload receipt
         async function uploadReceipt(file) {
             loading.classList.add('show');
             resultSection.classList.remove('show');
@@ -312,7 +682,7 @@
             try {
                 const formData = new FormData();
                 formData.append('file', file);
-                formData.append('owner', 'default-user');
+                formData.append('owner', OWNER);
 
                 const response = await fetch('/api/v1/receipts/upload/', {
                     method: 'POST',
@@ -326,78 +696,74 @@
 
                 if (response.ok) {
                     if (data.status === 'EXACT_DUPLICATE') {
-                        showDuplicate(data);
+                        showUploadResult(data, 'duplicate');
                     } else if (data.status === 'FAILED' || data.status === 'OCR_FAILED') {
-                        showError(data.message || 'Receipt processing failed.');
+                        showUploadResult(data, 'failed');
                     } else {
-                        showSuccess(data);
+                        showUploadResult(data, 'success');
                     }
+
+                    setTimeout(() => loadReceiptHistory(), 1000);
                 } else {
                     const errorMsg = data.error || data.errors || 'Upload failed';
-                    showError(errorMsg);
+                    showUploadError(errorMsg);
                 }
             } catch (error) {
-                showError(`Network error: ${error.message}`);
+                showUploadError('Something went wrong while processing the receipt. Please try again.');
             } finally {
                 loading.classList.remove('show');
                 btnUpload.disabled = false;
             }
         }
 
-        function showSuccess(data) {
+        // Show upload result
+        function showUploadResult(data, type) {
             resultSection.classList.add('show');
-            resultSection.className = 'result-section show result-success';
-            resultTitle.textContent = '✓ Receipt uploaded successfully';
+
+            let className = 'result-section show';
+            let title = '';
+            let icon = '';
+
+            if (type === 'success') {
+                className += ' result-approved';
+                title = 'Receipt Processed';
+                icon = '✓';
+            } else if (type === 'duplicate') {
+                className += ' result-duplicate';
+                title = 'Duplicate Detected';
+                icon = '⚠';
+            } else if (type === 'failed') {
+                className += ' result-failed';
+                title = 'Processing Failed';
+                icon = '✕';
+            }
+
+            resultSection.className = className;
+            resultTitle.textContent = icon + ' ' + title;
 
             let html = `
-                <div class="result-item">
-                    <span class="result-label">Receipt ID:</span>
-                    <span class="result-value">${escapeHtml(data.receipt_id)}</span>
-                </div>
                 <div class="result-item">
                     <span class="result-label">Status:</span>
                     <span class="result-value">${escapeHtml(data.status)}</span>
                 </div>
                 <div class="result-item">
                     <span class="result-label">Message:</span>
-                    <span class="result-value">${escapeHtml(data.message)}</span>
+                    <span class="result-value">${escapeHtml(data.message || '')}</span>
                 </div>
             `;
 
             resultContent.innerHTML = html;
         }
 
-        function showDuplicate(data) {
+        // Show upload error
+        function showUploadError(message) {
             resultSection.classList.add('show');
-            resultSection.className = 'result-section show result-duplicate';
-            resultTitle.textContent = '⚠ Duplicate detected';
-
-            let html = `
-                <div class="result-item">
-                    <span class="result-label">Receipt ID:</span>
-                    <span class="result-value">${escapeHtml(data.receipt_id)}</span>
-                </div>
-                <div class="result-item">
-                    <span class="result-label">Status:</span>
-                    <span class="result-value">${escapeHtml(data.status)}</span>
-                </div>
-                <div class="result-item">
-                    <span class="result-label">Reason:</span>
-                    <span class="result-value">${escapeHtml(data.message)}</span>
-                </div>
-            `;
-
-            resultContent.innerHTML = html;
-        }
-
-        function showError(message) {
-            resultSection.classList.add('show');
-            resultSection.className = 'result-section show result-error';
+            resultSection.className = 'result-section show result-failed';
             resultTitle.textContent = '✕ Error';
 
             let errorText = message;
             if (typeof message === 'object') {
-                errorText = JSON.stringify(message, null, 2);
+                errorText = 'An error occurred. Please try again.';
             }
 
             const html = `
@@ -410,11 +776,291 @@
             resultContent.innerHTML = html;
         }
 
+        // Load receipt history
+        async function loadReceiptHistory() {
+            try {
+                const params = new URLSearchParams();
+                params.append('owner', OWNER);
+
+                const status = filterStatus.value;
+                if (status) params.append('status', status);
+
+                const category = filterCategory.value;
+                if (category) params.append('category', category);
+
+                const response = await fetch(`/api/v1/receipts/?${params}`, {
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                    }
+                });
+
+                if (!response.ok) {
+                    receiptList.innerHTML = '<div class="empty-state"><p>Unable to load receipts</p></div>';
+                    return;
+                }
+
+                const receipts = await response.json();
+                renderReceiptList(receipts);
+            } catch (error) {
+                receiptList.innerHTML = '<div class="empty-state"><p>Unable to load receipts</p></div>';
+            }
+        }
+
+        // Render receipt list
+        function renderReceiptList(receipts) {
+            if (!receipts || receipts.length === 0) {
+                receiptList.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">📋</div>
+                        <p>No receipts found</p>
+                    </div>
+                `;
+                return;
+            }
+
+            let html = receipts.map(receipt => {
+                const statusBadgeClass = `receipt-status-badge status-${receipt.status.toLowerCase()}`;
+                const amount = receipt.total_amount ? `${receipt.currency || ''} ${receipt.total_amount}` : 'N/A';
+                const date = receipt.transaction_date ? formatDate(receipt.transaction_date) : 'N/A';
+
+                return `
+                    <div class="receipt-card">
+                        <div class="receipt-info">
+                            <div class="receipt-filename">${escapeHtml(receipt.original_filename)}</div>
+                            <div class="receipt-meta">
+                                <div class="receipt-meta-item">
+                                    <span class="receipt-meta-label">Vendor:</span>
+                                    <span>${escapeHtml(receipt.vendor_name || 'Unknown')}</span>
+                                </div>
+                                <div class="receipt-meta-item">
+                                    <span class="receipt-meta-label">Amount:</span>
+                                    <span>${escapeHtml(amount)}</span>
+                                </div>
+                                <div class="receipt-meta-item">
+                                    <span class="receipt-meta-label">Date:</span>
+                                    <span>${date}</span>
+                                </div>
+                                <div class="receipt-meta-item">
+                                    <span class="receipt-meta-label">Category:</span>
+                                    <span>${escapeHtml(receipt.category)}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="receipt-actions">
+                            <span class="${statusBadgeClass}">${receipt.status}</span>
+                            <button class="btn-preview" onclick="previewReceipt('${receipt.id}')">👁 Preview</button>
+                            <button class="btn-preview" onclick="viewDetails('${receipt.id}')">📄 Details</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            receiptList.innerHTML = html;
+        }
+
+        // Format date
+        function formatDate(dateStr) {
+            if (!dateStr) return 'N/A';
+            try {
+                const date = new Date(dateStr);
+                return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+            } catch {
+                return dateStr;
+            }
+        }
+
+        // Preview receipt
+        async function previewReceipt(receiptId) {
+            const previewModal = document.getElementById('previewModal');
+            const previewContent = document.getElementById('previewContent');
+
+            previewContent.innerHTML = '<div class="loading-state"><div class="spinner"></div><p>Loading preview...</p></div>';
+            previewModal.classList.add('show');
+
+            try {
+                const response = await fetch(`/api/v1/receipts/${receiptId}/preview/?owner=${OWNER}`, {
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                    }
+                });
+
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const contentType = response.headers.get('content-type');
+
+                    if (contentType.startsWith('image/')) {
+                        const url = URL.createObjectURL(blob);
+                        previewContent.innerHTML = `<img src="${url}" class="preview-image" />`;
+                    } else if (contentType === 'application/pdf') {
+                        const url = URL.createObjectURL(blob);
+                        previewContent.innerHTML = `
+                            <iframe src="${url}" style="width: 100%; height: 600px; border: none; border-radius: 4px;"></iframe>
+                        `;
+                    } else {
+                        previewContent.innerHTML = '<p>Preview not available for this file type.</p>';
+                    }
+                } else {
+                    previewContent.innerHTML = '<p>Unable to load preview.</p>';
+                }
+            } catch (error) {
+                previewContent.innerHTML = '<p>Failed to load preview. Please try again.</p>';
+            }
+        }
+
+        // View details
+        async function viewDetails(receiptId) {
+            const detailsModal = document.getElementById('detailsModal');
+            const detailsContent = document.getElementById('detailsContent');
+
+            detailsContent.innerHTML = '<div class="loading-state"><div class="spinner"></div><p>Loading details...</p></div>';
+            detailsModal.classList.add('show');
+
+            try {
+                const response = await fetch(`/api/v1/receipts/${receiptId}/?owner=${OWNER}`, {
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                    }
+                });
+
+                if (response.ok) {
+                    const receipt = await response.json();
+                    renderDetails(receipt);
+                } else {
+                    detailsContent.innerHTML = '<p>Unable to load receipt details.</p>';
+                }
+            } catch (error) {
+                detailsContent.innerHTML = '<p>Failed to load details. Please try again.</p>';
+            }
+        }
+
+        // Render details
+        function renderDetails(receipt) {
+            const detailsContent = document.getElementById('detailsContent');
+
+            let html = `
+                <div class="detail-item">
+                    <div class="detail-label">Status</div>
+                    <div class="detail-value">${escapeHtml(receipt.status)}</div>
+                </div>
+                <div class="detail-item">
+                    <div class="detail-label">Filename</div>
+                    <div class="detail-value">${escapeHtml(receipt.original_filename)}</div>
+                </div>
+                <div class="detail-item">
+                    <div class="detail-label">Category</div>
+                    <div class="detail-value">${escapeHtml(receipt.category)}</div>
+                </div>
+                <div class="detail-item">
+                    <div class="detail-label">Vendor</div>
+                    <div class="detail-value">${escapeHtml(receipt.vendor_name || 'N/A')}</div>
+                </div>
+                <div class="detail-item">
+                    <div class="detail-label">Transaction Date</div>
+                    <div class="detail-value">${receipt.transaction_date ? formatDate(receipt.transaction_date) : 'N/A'}</div>
+                </div>
+                <div class="detail-item">
+                    <div class="detail-label">Total Amount</div>
+                    <div class="detail-value">${receipt.currency || ''} ${receipt.total_amount || 'N/A'}</div>
+                </div>
+                <div class="detail-item">
+                    <div class="detail-label">Invoice Number</div>
+                    <div class="detail-value">${escapeHtml(receipt.invoice_number || 'N/A')}</div>
+                </div>
+                <div class="detail-item">
+                    <div class="detail-label">Payment Method</div>
+                    <div class="detail-value">${escapeHtml(receipt.payment_method || 'N/A')}</div>
+                </div>
+            `;
+
+            if (receipt.duplicate_score) {
+                html += `
+                    <div class="detail-item">
+                        <div class="detail-label">Duplicate Score</div>
+                        <div class="detail-value">${receipt.duplicate_score}</div>
+                    </div>
+                `;
+            }
+
+            if (receipt.duplicate_reason) {
+                html += `
+                    <div class="detail-item">
+                        <div class="detail-label">Duplicate Reason</div>
+                        <div class="detail-value">${escapeHtml(receipt.duplicate_reason)}</div>
+                    </div>
+                `;
+            }
+
+            if (receipt.processing_message) {
+                html += `
+                    <div class="detail-item">
+                        <div class="detail-label">Processing Message</div>
+                        <div class="detail-value">${escapeHtml(receipt.processing_message)}</div>
+                    </div>
+                `;
+            }
+
+            if (receipt.policy_status) {
+                html += `
+                    <div class="detail-item">
+                        <div class="detail-label">Policy Status</div>
+                        <div class="detail-value">${escapeHtml(receipt.policy_status)}</div>
+                    </div>
+                `;
+            }
+
+            html += `
+                <div class="detail-item">
+                    <div class="detail-label">Created</div>
+                    <div class="detail-value">${formatDate(receipt.created_at)}</div>
+                </div>
+            `;
+
+            detailsContent.innerHTML = html;
+        }
+
+        // Close modals
+        function closeDetailsModal() {
+            document.getElementById('detailsModal').classList.remove('show');
+        }
+
+        function closePreviewModal() {
+            document.getElementById('previewModal').classList.remove('show');
+        }
+
+        // Close modal on outside click
+        window.addEventListener('click', (e) => {
+            const detailsModal = document.getElementById('detailsModal');
+            const previewModal = document.getElementById('previewModal');
+
+            if (e.target === detailsModal) {
+                detailsModal.classList.remove('show');
+            }
+            if (e.target === previewModal) {
+                previewModal.classList.remove('show');
+            }
+        });
+
+        // Filter change handlers
+        filterStatus.addEventListener('change', loadReceiptHistory);
+        filterCategory.addEventListener('change', loadReceiptHistory);
+
+        // Escape key to close modals
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                document.getElementById('detailsModal').classList.remove('show');
+                document.getElementById('previewModal').classList.remove('show');
+            }
+        });
+
+        // Escape HTML
         function escapeHtml(text) {
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
         }
+
+        // Initial load
+        loadReceiptHistory();
     </script>
 </body>
 </html>

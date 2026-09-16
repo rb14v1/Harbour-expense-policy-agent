@@ -7,8 +7,8 @@ class ReceiptDetailSerializer(serializers.ModelSerializer):
         model = Receipt
         fields = [
             'id', 'status', 'original_filename', 'vendor_name', 'transaction_date',
-            'total_amount', 'currency', 'duplicate_score', 'duplicate_reason',
-            'policy_status', 'policy_result_json', 'created_at', 'updated_at'
+            'total_amount', 'currency', 'category', 'duplicate_score', 'duplicate_reason',
+            'processing_message', 'policy_status', 'policy_result_json', 'created_at', 'updated_at'
         ]
         read_only_fields = fields
 
@@ -21,8 +21,8 @@ class ReceiptStatusSerializer(serializers.ModelSerializer):
     class Meta:
         model = Receipt
         fields = [
-            'id', 'status', 'stage', 'is_final', 'message', 'duplicate_score',
-            'duplicate_reason', 'policy_status'
+            'id', 'status', 'stage', 'is_final', 'message', 'category', 'duplicate_score',
+            'duplicate_reason', 'processing_message', 'policy_status'
         ]
         read_only_fields = fields
 
@@ -75,7 +75,7 @@ class ReceiptListSerializer(serializers.ModelSerializer):
         model = Receipt
         fields = [
             'id', 'status', 'original_filename', 'vendor_name', 'transaction_date',
-            'total_amount', 'currency', 'created_at'
+            'total_amount', 'currency', 'category', 'processing_message', 'created_at'
         ]
         read_only_fields = fields
 
