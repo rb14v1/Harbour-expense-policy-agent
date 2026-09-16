@@ -295,15 +295,69 @@
             background: #e0e0e0;
         }
 
-        .preview-link {
-            color: #667eea;
-            text-decoration: none;
-            cursor: pointer;
-            font-weight: 600;
+        .attachment-card {
+            background: #f5f5f5;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 12px;
+            display: inline-block;
+            max-width: 100%;
         }
 
-        .preview-link:hover {
-            text-decoration: underline;
+        .attachment-icon {
+            font-size: 20px;
+            margin-right: 8px;
+        }
+
+        .attachment-info {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .attachment-name {
+            font-weight: 600;
+            color: #333;
+            word-break: break-word;
+        }
+
+        .attachment-meta {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+            flex-wrap: wrap;
+        }
+
+        .action-button {
+            padding: 8px 12px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            transition: background 0.2s;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .action-button:hover {
+            background: #5568d3;
+        }
+
+        .action-button.secondary {
+            background: #f0f0f0;
+            color: #667eea;
+        }
+
+        .action-button.secondary:hover {
+            background: #e0e0e0;
         }
 
         .error-message {
@@ -312,6 +366,14 @@
 
         .success-message {
             color: #10b981;
+        }
+
+        .field-group {
+            margin-bottom: 12px;
+        }
+
+        .field-group:last-child {
+            margin-bottom: 0;
         }
     </style>
 </head>
@@ -371,7 +433,16 @@
                 return;
             }
 
-            appendMessage('user', `📎 ${escapeHtml(file.name)}`);
+            const fileTypeMap = {
+                'application/pdf': 'PDF',
+                'image/jpeg': 'JPG',
+                'image/png': 'PNG'
+            };
+            const fileType = fileTypeMap[file.type] || 'File';
+            const fileSize = (file.size / 1024 / 1024).toFixed(2);
+
+            const attachmentHtml = `<div class="attachment-card"><div class="attachment-info"><div class="attachment-name">📄 ${escapeHtml(file.name)}</div><div class="attachment-meta">${fileType} • ${fileSize} MB</div></div></div>`;
+            appendMessage('user', attachmentHtml);
             appendMessage('assistant', '<div class="loading"><span>Processing your receipt...</span><div class="spinner"></div></div>');
 
             try {
@@ -528,13 +599,37 @@
             let html = `<div class="result-card ${statusClass}">`;
             html += `<div class="result-row"><div class="result-label">Status</div><div class="result-value"><span class="status-badge ${statusClass}">${statusText}</span></div></div>`;
 
+            if (receipt.original_filename) html += `<div class="result-row"><div class="result-label">Filename</div><div class="result-value">${escapeHtml(receipt.original_filename)}</div></div>`;
             if (receipt.vendor_name) html += `<div class="result-row"><div class="result-label">Vendor</div><div class="result-value">${escapeHtml(receipt.vendor_name)}</div></div>`;
             if (receipt.transaction_date) html += `<div class="result-row"><div class="result-label">Date</div><div class="result-value">${formatDate(receipt.transaction_date)}</div></div>`;
-            if (receipt.total_amount) html += `<div class="result-row"><div class="result-label">Amount</div><div class="result-value">${receipt.currency || ''} ${receipt.total_amount}</div></div>`;
-            if (receipt.category) html += `<div class="result-row"><div class="result-label">Category</div><div class="result-value">${escapeHtml(receipt.category)}</div></div>`;
-            if (receipt.processing_message) html += `<div class="result-row"><div class="result-label">Message</div><div class="result-value">${escapeHtml(receipt.processing_message)}</div></div>`;
+            if (receipt.total_amount) html += `<div class="result-row"><div class="result-label">Amount</div><div class="result-value">${receipt.currency || 'N/A'} ${receipt.total_amount}</div></div>`;
 
+            if (receipt.category) {
+                html += `<div class="result-row"><div class="result-label">Category</div><div class="result-value">${escapeHtml(receipt.category)}</div></div>`;
+
+                if (receipt.category_confidence !== null && receipt.category_confidence !== undefined) {
+                    const confidence = (receipt.category_confidence * 100).toFixed(0);
+                    html += `<div class="result-row"><div class="result-label">Confidence</div><div class="result-value">${confidence}%</div></div>`;
+                }
+
+                if (receipt.category_reason) {
+                    html += `<div class="result-row"><div class="result-label">Reason</div><div class="result-value">${escapeHtml(receipt.category_reason)}</div></div>`;
+                }
+            }
+
+            if (receipt.duplicate_reason) {
+                html += `<div class="result-row"><div class="result-label">Duplicate Info</div><div class="result-value">${escapeHtml(receipt.duplicate_reason)}</div></div>`;
+            }
+
+            if (receipt.processing_message) {
+                html += `<div class="result-row"><div class="result-label">Message</div><div class="result-value">${escapeHtml(receipt.processing_message)}</div></div>`;
+            }
+
+            html += '<div class="action-buttons">';
+            html += `<a class="action-button" href="/api/v1/receipts/${receipt.id}/preview/?owner=${OWNER}" target="_blank">📄 Preview Receipt</a>`;
             html += '</div>';
+            html += '</div>';
+
             appendMessage('assistant', html);
             clearFileInput();
         }
