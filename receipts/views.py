@@ -39,7 +39,7 @@ class ReceiptViewSet(viewsets.ReadOnlyModelViewSet):
         owner = self.request.query_params.get('owner', 'default-user')
         queryset = Receipt.objects.all().order_by('-created_at')
 
-        if self.action != 'preview':
+        if self.action not in ('preview', 'set_category'):
             queryset = queryset.filter(owner=owner)
 
             status_filter = self.request.query_params.get('status')
@@ -195,6 +195,41 @@ class ReceiptViewSet(viewsets.ReadOnlyModelViewSet):
         )
         response['Content-Disposition'] = f'inline; filename="{preview_receipt.original_filename}"'
         return response
+
+    @action(detail=False, methods=['get'])
+    def categories(self, request):
+        """Return the authoritative 45-category master list."""
+        categories = [choice[0] for choice in Receipt.CATEGORY_CHOICES]
+        return Response({'categories': categories})
+
+    @action(detail=True, methods=['post'], parser_classes=(parsers.JSONParser,))
+    def set_category(self, request, pk=None):
+        """Allow manual category selection."""
+        receipt = self.get_object()
+        owner = request.query_params.get('owner', 'default-user')
+
+        if receipt.owner != owner:
+            return Response(
+                {'error': 'Unauthorized'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        category = request.data.get('category')
+        valid_categories = [choice[0] for choice in Receipt.CATEGORY_CHOICES]
+
+        if category not in valid_categories:
+            return Response(
+                {'error': f'Invalid category. Must be one of {len(valid_categories)} valid categories.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        receipt.category = category
+        receipt.category_confidence = 1.0
+        receipt.category_reason = 'Manually selected by user'
+        receipt.save()
+
+        serializer = ReceiptDetailSerializer(receipt)
+        return Response(serializer.data)
 
 
 def upload_form_view(request):

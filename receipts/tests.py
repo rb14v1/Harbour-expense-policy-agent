@@ -7,6 +7,7 @@ from receipts.services import (
     NormalizationService,
     DuplicateService,
     PolicyService,
+    ReceiptService,
 )
 from receipts.exceptions import UnsupportedFileTypeError, ReceiptTooLargeError
 from datetime import datetime, timedelta, date
@@ -278,6 +279,105 @@ class PolicyServiceTests(TestCase):
         self.assertFalse(result['rules'][0]['passed'])
 
 
+class CategoryDetectionTests(TestCase):
+    def test_restaurant_dinner_detection(self):
+        extracted = {
+            'merchant': {'name': 'ABC Restaurant', 'address': None, 'phone': None},
+            'line_items': [{'description': 'Dinner service', 'quantity': 1}],
+            'invoice': {'invoice_number': None, 'transaction_date': None},
+            'amounts': {'subtotal': None, 'tax': None, 'total': 1000, 'currency': 'USD'},
+            'payment': {'method': None},
+            'extraction': {},
+        }
+        result = ReceiptService.determine_category(extracted)
+        self.assertIn('Dinner', result['category'])
+        self.assertGreaterEqual(result['confidence'], 0.75)
+
+    def test_hotel_detection(self):
+        extracted = {
+            'merchant': {'name': 'Hilton Hotel', 'address': None, 'phone': None},
+            'line_items': [{'description': 'Room charge', 'quantity': 1}],
+            'invoice': {'invoice_number': None, 'transaction_date': None},
+            'amounts': {'subtotal': None, 'tax': None, 'total': 500, 'currency': 'USD'},
+            'payment': {'method': None},
+            'extraction': {},
+        }
+        result = ReceiptService.determine_category(extracted)
+        self.assertEqual(result['category'], 'Accommodation/Hotel')
+        self.assertGreaterEqual(result['confidence'], 0.75)
+
+    def test_uber_detection(self):
+        extracted = {
+            'merchant': {'name': 'Uber', 'address': None, 'phone': None},
+            'line_items': [{'description': 'Ride', 'quantity': 1}],
+            'invoice': {'invoice_number': None, 'transaction_date': None},
+            'amounts': {'subtotal': None, 'tax': None, 'total': 25, 'currency': 'USD'},
+            'payment': {'method': None},
+            'extraction': {},
+        }
+        result = ReceiptService.determine_category(extracted)
+        self.assertEqual(result['category'], 'Transport: Taxis/Cab/Uber')
+        self.assertGreaterEqual(result['confidence'], 0.75)
+
+    def test_flight_detection(self):
+        extracted = {
+            'merchant': {'name': 'Airline Tickets', 'address': None, 'phone': None},
+            'line_items': [{'description': 'Flight booking', 'quantity': 1}],
+            'invoice': {'invoice_number': None, 'transaction_date': None},
+            'amounts': {'subtotal': None, 'tax': None, 'total': 300, 'currency': 'USD'},
+            'payment': {'method': None},
+            'extraction': {},
+        }
+        result = ReceiptService.determine_category(extracted)
+        self.assertEqual(result['category'], 'Transport: Flights')
+        self.assertGreaterEqual(result['confidence'], 0.75)
+
+    def test_software_detection(self):
+        extracted = {
+            'merchant': {'name': 'Adobe Software', 'address': None, 'phone': None},
+            'line_items': [{'description': 'License', 'quantity': 1}],
+            'invoice': {'invoice_number': None, 'transaction_date': None},
+            'amounts': {'subtotal': None, 'tax': None, 'total': 600, 'currency': 'USD'},
+            'payment': {'method': None},
+            'extraction': {},
+        }
+        result = ReceiptService.determine_category(extracted)
+        self.assertEqual(result['category'], 'Software')
+        self.assertGreaterEqual(result['confidence'], 0.75)
+
+    def test_low_confidence_handling(self):
+        extracted = {
+            'merchant': {'name': 'Unknown Store', 'address': None, 'phone': None},
+            'line_items': [{'description': 'Item', 'quantity': 1}],
+            'invoice': {'invoice_number': None, 'transaction_date': None},
+            'amounts': {'subtotal': None, 'tax': None, 'total': 100, 'currency': 'USD'},
+            'payment': {'method': None},
+            'extraction': {},
+        }
+        result = ReceiptService.determine_category(extracted)
+        self.assertEqual(result['category'], 'Other')
+        self.assertLess(result['confidence'], 0.80)
+
+    def test_empty_extraction_returns_other(self):
+        result = ReceiptService.determine_category({})
+        self.assertEqual(result['category'], 'Other')
+        self.assertEqual(result['confidence'], 0.0)
+
+    def test_category_result_has_required_fields(self):
+        extracted = {
+            'merchant': {'name': 'Restaurant', 'address': None, 'phone': None},
+            'line_items': [],
+            'invoice': {'invoice_number': None, 'transaction_date': None},
+            'amounts': {'subtotal': None, 'tax': None, 'total': 50, 'currency': 'USD'},
+            'payment': {'method': None},
+            'extraction': {},
+        }
+        result = ReceiptService.determine_category(extracted)
+        self.assertIn('category', result)
+        self.assertIn('confidence', result)
+        self.assertIn('reason', result)
+
+
 class CategoryMasterTests(TestCase):
     def test_all_45_categories_exist(self):
         expected_categories = [
@@ -371,6 +471,85 @@ class CategoryMasterTests(TestCase):
         actual_categories = [choice[0] for choice in Receipt.CATEGORY_CHOICES]
         for old_cat in old_categories:
             self.assertNotIn(old_cat, actual_categories)
+
+
+class CategoryAPITests(TestCase):
+    def test_categories_endpoint_returns_45_categories(self):
+        from django.test import Client
+        client = Client()
+        response = client.get('/api/v1/receipts/categories/', {
+            'X-Requested-With': 'XMLHttpRequest'
+        })
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertIn('categories', data)
+        self.assertEqual(len(data['categories']), 45)
+
+    def test_set_category_valid(self):
+        from rest_framework.test import APIClient
+        receipt = Receipt.objects.create(
+            owner="cat-test",
+            original_filename="test.pdf",
+            blob_name="receipts/cat-test/uuid/test.pdf",
+            mime_type="application/pdf",
+            file_size=1000,
+            sha256_hash="cathash",
+            category="Other",
+        )
+
+        client = APIClient()
+        response = client.post(
+            f'/api/v1/receipts/{receipt.id}/set_category/?owner=cat-test',
+            {'category': 'Accommodation/Hotel'},
+            format='json'
+        )
+
+        self.assertEqual(response.status_code, 200)
+        receipt.refresh_from_db()
+        self.assertEqual(receipt.category, 'Accommodation/Hotel')
+        self.assertEqual(receipt.category_confidence, 1.0)
+
+    def test_set_category_invalid(self):
+        from rest_framework.test import APIClient
+        receipt = Receipt.objects.create(
+            owner="cat-test",
+            original_filename="test.pdf",
+            blob_name="receipts/cat-test/uuid/test.pdf",
+            mime_type="application/pdf",
+            file_size=1000,
+            sha256_hash="cathash2",
+            category="Other",
+        )
+
+        client = APIClient()
+        response = client.post(
+            f'/api/v1/receipts/{receipt.id}/set_category/?owner=cat-test',
+            {'category': 'Invalid Category'},
+            format='json'
+        )
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_set_category_unauthorized(self):
+        from rest_framework.test import APIClient
+        receipt = Receipt.objects.create(
+            owner="other-owner",
+            original_filename="test.pdf",
+            blob_name="receipts/other-owner/uuid/test.pdf",
+            mime_type="application/pdf",
+            file_size=1000,
+            sha256_hash="cathash3",
+            category="Other",
+        )
+
+        client = APIClient()
+        response = client.post(
+            f'/api/v1/receipts/{receipt.id}/set_category/?owner=cat-test',
+            {'category': 'Accommodation/Hotel'},
+            format='json'
+        )
+
+        self.assertEqual(response.status_code, 403)
 
 
 class ReceiptListSerializerTests(TestCase):

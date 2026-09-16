@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Expense Receipt Management</title>
+    <title>Expense Policy Assistant</title>
     <style>
         * {
             margin: 0;
@@ -13,707 +13,366 @@
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            background: #f5f5f5;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
             padding: 20px;
-        }
-
-        .app-container {
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-
-        .header {
-            background: white;
-            padding: 30px;
-            border-radius: 8px;
-            margin-bottom: 30px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-        }
-
-        h1 {
-            font-size: 28px;
-            color: #333;
-            margin-bottom: 8px;
-        }
-
-        .subtitle {
-            font-size: 14px;
-            color: #666;
-        }
-
-        .main-content {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 30px;
-            margin-bottom: 30px;
-        }
-
-        @media (max-width: 768px) {
-            .main-content {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        .card {
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-            padding: 30px;
-        }
-
-        .card-title {
-            font-size: 18px;
-            font-weight: 600;
-            margin-bottom: 20px;
-            color: #333;
-            border-bottom: 2px solid #f0f0f0;
-            padding-bottom: 12px;
-        }
-
-        .form-group {
-            margin-bottom: 20px;
-        }
-
-        label {
-            display: block;
-            font-size: 14px;
-            font-weight: 500;
-            color: #555;
-            margin-bottom: 8px;
-        }
-
-        input[type="file"] {
-            width: 100%;
-            padding: 10px;
-            border: 2px solid #ddd;
-            border-radius: 4px;
-            font-size: 14px;
-            cursor: pointer;
-        }
-
-        input[type="file"]:focus {
-            outline: none;
-            border-color: #0066cc;
-        }
-
-        .file-info {
-            margin-top: 8px;
-            font-size: 12px;
-            color: #666;
-        }
-
-        .max-size {
-            color: #999;
-            font-style: italic;
-        }
-
-        .form-actions {
-            display: flex;
-            gap: 10px;
-            margin-top: 25px;
-        }
-
-        button {
-            flex: 1;
-            padding: 12px 20px;
-            font-size: 14px;
-            font-weight: 600;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .btn-primary {
-            background: #0066cc;
-            color: white;
-        }
-
-        .btn-primary:hover:not(:disabled) {
-            background: #0052a3;
-        }
-
-        .btn-primary:disabled {
-            background: #ccc;
-            cursor: not-allowed;
-        }
-
-        .btn-secondary {
-            background: #f0f0f0;
-            color: #333;
-        }
-
-        .btn-secondary:hover {
-            background: #e0e0e0;
-        }
-
-        .btn-small {
-            padding: 6px 12px;
-            font-size: 12px;
-            width: auto;
-            flex: none;
-        }
-
-        .btn-preview {
-            background: #f0f0f0;
-            color: #333;
-            padding: 6px 10px;
-            font-size: 12px;
-            border-radius: 3px;
-            width: auto;
-        }
-
-        .btn-preview:hover {
-            background: #e0e0e0;
-        }
-
-        .loading {
-            display: none;
-            text-align: center;
-            margin-top: 20px;
-        }
-
-        .loading.show {
-            display: block;
-        }
-
-        .spinner {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 3px solid #f3f3f3;
-            border-top: 3px solid #0066cc;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        .result-section {
-            margin-top: 25px;
-            padding: 20px;
-            border-radius: 4px;
-            display: none;
-        }
-
-        .result-section.show {
-            display: block;
-        }
-
-        .result-success {
-            background: #f0fdf4;
-            border: 1px solid #86efac;
-            color: #166534;
-        }
-
-        .result-approved {
-            background: #f0fdf4;
-            border: 1px solid #86efac;
-            color: #166534;
-        }
-
-        .result-rejected {
-            background: #fef2f2;
-            border: 1px solid #fca5a5;
-            color: #991b1b;
-        }
-
-        .result-duplicate {
-            background: #fef3c7;
-            border: 1px solid #fde047;
-            color: #92400e;
-        }
-
-        .result-failed {
-            background: #fef2f2;
-            border: 1px solid #fca5a5;
-            color: #991b1b;
-        }
-
-        .result-processing {
-            background: #eff6ff;
-            border: 1px solid #93c5fd;
-            color: #1e40af;
-        }
-
-        .result-title {
-            font-weight: 600;
-            margin-bottom: 12px;
-            font-size: 14px;
-        }
-
-        .result-item {
-            display: flex;
-            justify-content: space-between;
-            padding: 8px 0;
-            font-size: 13px;
-            border-bottom: 1px solid rgba(0, 0, 0, 0.1);
-        }
-
-        .result-item:last-child {
-            border-bottom: none;
-        }
-
-        .result-label {
-            font-weight: 500;
-        }
-
-        .result-value {
-            word-break: break-all;
-            text-align: right;
-            flex: 1;
-            margin-left: 10px;
-        }
-
-        .receipt-history-container {
-            grid-column: 1 / -1;
-        }
-
-        .history-filters {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-            flex-wrap: wrap;
-        }
-
-        .filter-group {
-            display: flex;
-            gap: 8px;
-            align-items: center;
-        }
-
-        .filter-group label {
-            margin: 0;
-            font-size: 12px;
-        }
-
-        .filter-group select {
-            padding: 6px 8px;
-            font-size: 12px;
-            border: 1px solid #ddd;
-            border-radius: 3px;
-        }
-
-        .receipt-list {
-            display: grid;
-            gap: 15px;
-        }
-
-        .receipt-card {
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            padding: 15px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            hover-bg: #f9f9f9;
-            transition: background 0.2s;
-        }
-
-        .receipt-card:hover {
-            background: #f9f9f9;
-        }
-
-        .receipt-info {
-            flex: 1;
-        }
-
-        .receipt-filename {
-            font-weight: 500;
-            color: #333;
-            margin-bottom: 4px;
-            font-size: 13px;
-        }
-
-        .receipt-meta {
-            font-size: 12px;
-            color: #666;
-            display: flex;
-            gap: 20px;
-        }
-
-        .receipt-meta-item {
-            display: flex;
-            gap: 4px;
-        }
-
-        .receipt-meta-label {
-            font-weight: 500;
-            color: #555;
-        }
-
-        .receipt-status-badge {
-            padding: 4px 8px;
-            border-radius: 3px;
-            font-size: 11px;
-            font-weight: 600;
-            margin-right: 10px;
-        }
-
-        .status-uploaded {
-            background: #dbeafe;
-            color: #1e40af;
-        }
-
-        .status-processing {
-            background: #fef3c7;
-            color: #92400e;
-        }
-
-        .status-approved {
-            background: #dcfce7;
-            color: #166534;
-        }
-
-        .status-rejected {
-            background: #fee2e2;
-            color: #991b1b;
-        }
-
-        .status-duplicate {
-            background: #fef3c7;
-            color: #92400e;
-        }
-
-        .status-failed {
-            background: #fee2e2;
-            color: #991b1b;
-        }
-
-        .receipt-actions {
-            display: flex;
-            gap: 8px;
-        }
-
-        .empty-state {
-            text-align: center;
-            padding: 40px 20px;
-            color: #999;
-        }
-
-        .empty-state-icon {
-            font-size: 40px;
-            margin-bottom: 12px;
-        }
-
-        /* Modal styles */
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 1000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.5);
-            overflow: auto;
-        }
-
-        .modal.show {
             display: flex;
             align-items: center;
             justify-content: center;
         }
 
-        .modal-content {
-            background-color: white;
-            padding: 30px;
-            border-radius: 8px;
+        .chat-container {
+            width: 100%;
             max-width: 600px;
-            max-height: 80vh;
-            overflow-y: auto;
-            width: 90%;
-            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            display: flex;
+            flex-direction: column;
+            height: 90vh;
+            max-height: 800px;
         }
 
-        .modal-header {
+        .chat-header {
+            padding: 20px;
+            background: #667eea;
+            color: white;
+            border-radius: 12px 12px 0 0;
+            text-align: center;
+        }
+
+        .chat-header h1 {
+            font-size: 20px;
+            margin-bottom: 5px;
+        }
+
+        .chat-header p {
+            font-size: 12px;
+            opacity: 0.9;
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .message {
+            display: flex;
+            gap: 10px;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .message.user {
+            flex-direction: row-reverse;
+        }
+
+        .message-bubble {
+            padding: 12px 16px;
+            border-radius: 12px;
+            max-width: 80%;
+            word-wrap: break-word;
+        }
+
+        .message.assistant .message-bubble {
+            background: #f0f0f0;
+            color: #333;
+        }
+
+        .message.user .message-bubble {
+            background: #667eea;
+            color: white;
+        }
+
+        .loading {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .result-card {
+            background: #f9f9f9;
+            border-left: 4px solid #667eea;
+            padding: 16px;
+            border-radius: 8px;
+            font-size: 13px;
+        }
+
+        .result-card.approved {
+            border-left-color: #10b981;
+        }
+
+        .result-card.rejected {
+            border-left-color: #ef4444;
+        }
+
+        .result-card.duplicate {
+            border-left-color: #f59e0b;
+        }
+
+        .result-row {
             display: flex;
             justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-            border-bottom: 1px solid #f0f0f0;
-            padding-bottom: 15px;
+            padding: 8px 0;
+            border-bottom: 1px solid #e0e0e0;
         }
 
-        .modal-title {
-            font-size: 18px;
-            font-weight: 600;
-            color: #333;
-        }
-
-        .modal-close {
-            background: none;
-            border: none;
-            font-size: 24px;
-            color: #999;
-            cursor: pointer;
-            padding: 0;
-        }
-
-        .modal-close:hover {
-            color: #333;
-        }
-
-        .detail-item {
-            margin-bottom: 15px;
-            border-bottom: 1px solid #f0f0f0;
-            padding-bottom: 12px;
-        }
-
-        .detail-item:last-child {
+        .result-row:last-child {
             border-bottom: none;
         }
 
-        .detail-label {
+        .result-label {
             font-weight: 600;
-            color: #555;
-            font-size: 12px;
-            text-transform: uppercase;
-            margin-bottom: 4px;
+            color: #666;
         }
 
-        .detail-value {
+        .result-value {
             color: #333;
-            font-size: 14px;
-            word-break: break-word;
+            text-align: right;
+            flex: 1;
+            margin-left: 12px;
         }
 
-        .preview-modal-content {
-            max-width: 800px;
-        }
-
-        .preview-image {
-            max-width: 100%;
-            height: auto;
+        .status-badge {
+            display: inline-block;
+            padding: 4px 8px;
             border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
         }
 
-        .loading-state {
+        .status-badge.approved {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .status-badge.rejected {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .status-badge.duplicate {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .category-selector {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin: 12px 0;
+        }
+
+        .category-selector select {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .category-selector button {
+            padding: 10px 16px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+
+        .category-selector button:hover {
+            background: #5568d3;
+        }
+
+        .category-selector button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .chat-input-area {
+            padding: 16px;
+            border-top: 1px solid #e0e0e0;
+            display: flex;
+            gap: 10px;
+        }
+
+        .file-input-wrapper {
+            position: relative;
+            flex: 1;
+        }
+
+        input[type="file"] {
+            position: absolute;
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .file-input-label {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 10px 16px;
+            background: #f0f0f0;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .file-input-label:hover {
+            background: #e0e0e0;
+        }
+
+        .send-button {
+            padding: 10px 20px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+
+        .send-button:hover:not(:disabled) {
+            background: #5568d3;
+        }
+
+        .send-button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .selected-file {
+            font-size: 12px;
+            color: #666;
+            padding: 8px;
+            background: #f9f9f9;
+            border-radius: 4px;
             text-align: center;
-            padding: 40px;
-            color: #999;
+        }
+
+        .clear-button {
+            padding: 8px 12px;
+            background: #f0f0f0;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: background 0.2s;
+        }
+
+        .clear-button:hover {
+            background: #e0e0e0;
+        }
+
+        .preview-link {
+            color: #667eea;
+            text-decoration: none;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .preview-link:hover {
+            text-decoration: underline;
+        }
+
+        .error-message {
+            color: #dc2626;
+        }
+
+        .success-message {
+            color: #10b981;
         }
     </style>
 </head>
 <body>
-    <div class="app-container">
-        <div class="header">
-            <h1>Expense Receipt Management</h1>
-            <p class="subtitle">Upload and manage your expense receipts</p>
+    <div class="chat-container">
+        <div class="chat-header">
+            <h1>💰 Expense Policy Assistant</h1>
+            <p>Upload your expense receipts for automated processing</p>
         </div>
 
-        <div class="main-content">
-            <!-- Upload Card -->
-            <div class="card">
-                <div class="card-title">Upload Receipt</div>
-
-                <form id="uploadForm">
-                    <div class="form-group">
-                        <label for="receipt-file">Select receipt file:</label>
-                        <div>
-                            <input
-                                type="file"
-                                id="receipt-file"
-                                name="file"
-                                accept=".pdf,.jpg,.jpeg,.png"
-                                required
-                            >
-                            <div class="file-info" id="file-name"></div>
-                            <div class="file-info max-size">Maximum size: 20 MB</div>
-                        </div>
-                    </div>
-
-                    <div class="form-actions">
-                        <button type="submit" class="btn-primary" id="btn-upload">Upload Receipt</button>
-                        <button type="reset" class="btn-secondary" id="btn-clear">Clear</button>
-                    </div>
-                </form>
-
-                <div class="loading" id="loading">
-                    <div class="spinner"></div>
-                    <p style="margin-top: 10px; font-size: 13px; color: #666;">Processing receipt...</p>
-                </div>
-
-                <div class="result-section" id="result-section">
-                    <div class="result-title" id="result-title"></div>
-                    <div id="result-content"></div>
-                </div>
-            </div>
-
-            <!-- History Card -->
-            <div class="card">
-                <div class="card-title">Receipt History</div>
-
-                <div class="history-filters">
-                    <div class="filter-group">
-                        <label for="filter-status">Status:</label>
-                        <select id="filter-status">
-                            <option value="">All</option>
-                            <option value="APPROVED">Approved</option>
-                            <option value="REJECTED">Rejected</option>
-                            <option value="UPLOADED">Uploaded</option>
-                            <option value="EXACT_DUPLICATE">Duplicate</option>
-                            <option value="FAILED">Failed</option>
-                        </select>
-                    </div>
-                    <div class="filter-group">
-                        <label for="filter-category">Category:</label>
-                        <select id="filter-category">
-                            <option value="">All</option>
-                            <option value="Accommodation/Hotel">Accommodation/Hotel</option>
-                            <option value="Australia - Mileage (KM) - electric vehicle">Australia - Mileage (KM) - electric vehicle</option>
-                            <option value="Australia - Mileage (KM)- Petrol or diesel vehicle">Australia - Mileage (KM)- Petrol or diesel vehicle</option>
-                            <option value="Bank Charges">Bank Charges</option>
-                            <option value="Client Entertainment">Client Entertainment</option>
-                            <option value="Computer Peripherals">Computer Peripherals</option>
-                            <option value="Food: Breakfast or Lunch - Max Claim: €/$/AUD 15 / INR700">Food: Breakfast or Lunch - Max Claim: €/$/AUD 15 / INR700</option>
-                            <option value="Food: Dinner - Max Claim: €/$/AUD 45 / INR700">Food: Dinner - Max Claim: €/$/AUD 45 / INR700</option>
-                            <option value="Food: Per Diem - Max Claim: €/$/AUD 45 / INR 4000">Food: Per Diem - Max Claim: €/$/AUD 45 / INR 4000</option>
-                            <option value="India - Mileage (KM) - electric vehicle - four wheeler">India - Mileage (KM) - electric vehicle - four wheeler</option>
-                            <option value="India - Mileage (KM) - Petrol or diesel vehicle - four wheeler">India - Mileage (KM) - Petrol or diesel vehicle - four wheeler</option>
-                            <option value="India - Mileage (KM) - Petrol or diesel vehicle - two wheeler">India - Mileage (KM) - Petrol or diesel vehicle - two wheeler</option>
-                            <option value="India - Mileage (KM)- electric vehicle - two wheeler">India - Mileage (KM)- electric vehicle - two wheeler</option>
-                            <option value="Other">Other</option>
-                            <option value="Phone Bills/Broadband">Phone Bills/Broadband</option>
-                            <option value="Prepaid Accommodation">Prepaid Accommodation</option>
-                            <option value="Prepaid Car Rental & Fuel">Prepaid Car Rental & Fuel</option>
-                            <option value="Prepaid Flights">Prepaid Flights</option>
-                            <option value="Prepaid Luas/Bus/Train">Prepaid Luas/Bus/Train</option>
-                            <option value="Prepaid Other">Prepaid Other</option>
-                            <option value="Print & Postage">Print & Postage</option>
-                            <option value="ROI - Mileage (KM) - electric vehicle - Lower Mileage Rate">ROI - Mileage (KM) - electric vehicle - Lower Mileage Rate</option>
-                            <option value="ROI - Mileage (KM) - electric vehicle - Upper Mileage Rate">ROI - Mileage (KM) - electric vehicle - Upper Mileage Rate</option>
-                            <option value="ROI - Mileage (KM) - Petrol or diesel vehicle - Lower Mileage Rate">ROI - Mileage (KM) - Petrol or diesel vehicle - Lower Mileage Rate</option>
-                            <option value="ROI - Mileage (KM) - Petrol or diesel vehicle - Upper Mileage Rate">ROI - Mileage (KM) - Petrol or diesel vehicle - Upper Mileage Rate</option>
-                            <option value="Slovenia - Mileage (KM) - electric vehicle - Residential">Slovenia - Mileage (KM) - electric vehicle - Residential</option>
-                            <option value="Slovenia - Mileage (KM) - Petrol or diesel vehicle - Non-Residential">Slovenia - Mileage (KM) - Petrol or diesel vehicle - Non-Residential</option>
-                            <option value="Slovenia - Mileage (KM) - Petrol or diesel vehicle - Residential">Slovenia - Mileage (KM) - Petrol or diesel vehicle - Residential</option>
-                            <option value="Slovenia - Mileage (KM)- electric vehicle - Non-Residential">Slovenia - Mileage (KM)- electric vehicle - Non-Residential</option>
-                            <option value="Software">Software</option>
-                            <option value="Spain - Mileage (KM) - electric vehicle">Spain - Mileage (KM) - electric vehicle</option>
-                            <option value="Spain - Mileage (KM)- Petrol or diesel vehicle">Spain - Mileage (KM)- Petrol or diesel vehicle</option>
-                            <option value="Stationery Consumables">Stationery Consumables</option>
-                            <option value="Training">Training</option>
-                            <option value="Transport: Car Rental & Fuel">Transport: Car Rental & Fuel</option>
-                            <option value="Transport: Flights">Transport: Flights</option>
-                            <option value="Transport: Luas/Bus/Train">Transport: Luas/Bus/Train</option>
-                            <option value="Transport: Taxis/Cab/Uber">Transport: Taxis/Cab/Uber</option>
-                            <option value="Travel Other incl. Parking & Tolls">Travel Other incl. Parking & Tolls</option>
-                            <option value="UK - Mileage (miles) - electric vehicle - Lower Mileage Rate">UK - Mileage (miles) - electric vehicle - Lower Mileage Rate</option>
-                            <option value="UK - Mileage (miles) - electric vehicle - Upper Mileage Rate">UK - Mileage (miles) - electric vehicle - Upper Mileage Rate</option>
-                            <option value="UK - Mileage (miles) - Petrol or diesel vehicle - Lower Mileage Rate">UK - Mileage (miles) - Petrol or diesel vehicle - Lower Mileage Rate</option>
-                            <option value="UK - Mileage (miles) - Petrol or diesel vehicle - Upper Mileage Rate">UK - Mileage (miles) - Petrol or diesel vehicle - Upper Mileage Rate</option>
-                            <option value="USA - Mileage (miles) - electric vehicle">USA - Mileage (miles) - electric vehicle</option>
-                            <option value="USA - Mileage (miles)- Petrol or diesel vehicle">USA - Mileage (miles)- Petrol or diesel vehicle</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="receipt-list" id="receipt-list">
-                    <div class="empty-state">
-                        <div class="empty-state-icon">📋</div>
-                        <p>No receipts uploaded yet</p>
-                    </div>
+        <div class="chat-messages" id="chatMessages">
+            <div class="message assistant">
+                <div class="message-bubble">
+                    Hi! I'm your Expense Policy Assistant. Send me your expense receipt (PDF, JPG, or PNG) and I'll process it for you.
                 </div>
             </div>
         </div>
-    </div>
 
-    <!-- Details Modal -->
-    <div id="detailsModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2 class="modal-title">Receipt Details</h2>
-                <button class="modal-close" onclick="closeDetailsModal()">&times;</button>
+        <div class="chat-input-area">
+            <div class="file-input-wrapper">
+                <label for="receiptFile" class="file-input-label">
+                    📎 Choose receipt
+                </label>
+                <input type="file" id="receiptFile" accept=".pdf,.jpg,.jpeg,.png" />
             </div>
-            <div id="detailsContent"></div>
+            <button class="send-button" id="uploadButton" onclick="uploadReceipt()">Send</button>
+            <button class="clear-button" id="clearButton" onclick="clearChat()">New</button>
         </div>
-    </div>
 
-    <!-- Preview Modal -->
-    <div id="previewModal" class="modal">
-        <div class="modal-content preview-modal-content">
-            <div class="modal-header">
-                <h2 class="modal-title">Receipt Preview</h2>
-                <button class="modal-close" onclick="closePreviewModal()">&times;</button>
-            </div>
-            <div id="previewContent"></div>
-        </div>
+        <div class="selected-file" id="selectedFile" style="display: none;"></div>
     </div>
 
     <script>
         const OWNER = 'default-user';
-        const form = document.getElementById('uploadForm');
-        const fileInput = document.getElementById('receipt-file');
-        const fileNameDisplay = document.getElementById('file-name');
-        const loading = document.getElementById('loading');
-        const resultSection = document.getElementById('result-section');
-        const resultTitle = document.getElementById('result-title');
-        const resultContent = document.getElementById('result-content');
-        const btnUpload = document.getElementById('btn-upload');
-        const filterStatus = document.getElementById('filter-status');
-        const filterCategory = document.getElementById('filter-category');
-        const receiptList = document.getElementById('receipt-list');
+        const CATEGORY_CONFIDENCE_THRESHOLD = 0.80;
 
-        // File input change handler
-        fileInput.addEventListener('change', (e) => {
-            if (fileInput.files.length > 0) {
-                const file = fileInput.files[0];
-                const sizeMB = (file.size / (1024 * 1024)).toFixed(2);
-                fileNameDisplay.textContent = `Selected: ${escapeHtml(file.name)} (${sizeMB} MB)`;
-            } else {
-                fileNameDisplay.textContent = '';
+        document.getElementById('receiptFile').addEventListener('change', function(e) {
+            const file = this.files[0];
+            if (file) {
+                const fileDiv = document.getElementById('selectedFile');
+                fileDiv.textContent = `Selected: ${escapeHtml(file.name)} (${(file.size / 1024 / 1024).toFixed(2)} MB)`;
+                fileDiv.style.display = 'block';
             }
         });
 
-        // Clear button
-        document.getElementById('btn-clear').addEventListener('click', (e) => {
-            e.preventDefault();
-            fileInput.value = '';
-            fileNameDisplay.textContent = '';
-            loading.classList.remove('show');
-            resultSection.classList.remove('show');
-            resultSection.className = 'result-section';
-            resultTitle.textContent = '';
-            resultContent.innerHTML = '';
-            btnUpload.disabled = false;
-        });
-
-        // Upload form submission
-        form.addEventListener('submit', async (e) => {
-            e.preventDefault();
-
+        async function uploadReceipt() {
+            const fileInput = document.getElementById('receiptFile');
             if (!fileInput.files.length) {
-                showUploadError('Please select a file');
+                appendMessage('assistant', 'Please select a receipt file first.');
                 return;
             }
 
             const file = fileInput.files[0];
-
-            // Client-side validation
             const maxSizeBytes = 20 * 1024 * 1024;
             if (file.size > maxSizeBytes) {
-                showUploadError('File size exceeds the maximum allowed size of 20 MB.');
+                appendMessage('assistant', 'File size exceeds 20 MB limit. Please choose a smaller file.');
                 return;
             }
 
-            const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png'];
-            if (!allowedTypes.includes(file.type)) {
-                showUploadError('File type not supported. Please upload PDF, JPG, or PNG.');
-                return;
-            }
-
-            await uploadReceipt(file);
-        });
-
-        // Upload receipt
-        async function uploadReceipt(file) {
-            loading.classList.add('show');
-            resultSection.classList.remove('show');
-            btnUpload.disabled = true;
+            appendMessage('user', `📎 ${escapeHtml(file.name)}`);
+            appendMessage('assistant', '<div class="loading"><span>Processing your receipt...</span><div class="spinner"></div></div>');
 
             try {
                 const formData = new FormData();
@@ -723,179 +382,188 @@
                 const response = await fetch('/api/v1/receipts/upload/', {
                     method: 'POST',
                     body: formData,
-                    headers: {
-                        'X-Requested-With': 'XMLHttpRequest',
-                    }
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
                 });
-
-                const data = await response.json();
 
                 if (response.ok) {
-                    if (data.status === 'EXACT_DUPLICATE') {
-                        showUploadResult(data, 'duplicate');
-                    } else if (data.status === 'FAILED' || data.status === 'OCR_FAILED') {
-                        showUploadResult(data, 'failed');
-                    } else {
-                        showUploadResult(data, 'success');
-                    }
+                    const data = await response.json();
+                    const receiptId = data.receipt_id;
+                    removeLastMessage();
 
-                    setTimeout(() => loadReceiptHistory(), 1000);
+                    if (data.status === 'EXACT_DUPLICATE') {
+                        appendMessage('assistant', `⚠️ ${escapeHtml(data.message)}`);
+                    } else {
+                        pollReceiptStatus(receiptId);
+                    }
                 } else {
-                    const errorMsg = data.error || data.errors || 'Upload failed';
-                    showUploadError(errorMsg);
+                    removeLastMessage();
+                    appendMessage('assistant', 'Upload failed. Please try again.');
                 }
             } catch (error) {
-                showUploadError('Something went wrong while processing the receipt. Please try again.');
-            } finally {
-                loading.classList.remove('show');
-                btnUpload.disabled = false;
+                removeLastMessage();
+                appendMessage('assistant', `Error: ${escapeHtml(error.message)}`);
             }
         }
 
-        // Show upload result
-        function showUploadResult(data, type) {
-            resultSection.classList.add('show');
+        async function pollReceiptStatus(receiptId) {
+            const maxAttempts = 30;
+            let attempts = 0;
 
-            let className = 'result-section show';
-            let title = '';
-            let icon = '';
+            const poll = async () => {
+                try {
+                    const response = await fetch(`/api/v1/receipts/${receiptId}/?owner=${OWNER}`, {
+                        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                    });
 
-            if (type === 'success') {
-                className += ' result-approved';
-                title = 'Receipt Processed';
-                icon = '✓';
-            } else if (type === 'duplicate') {
-                className += ' result-duplicate';
-                title = 'Duplicate Detected';
-                icon = '⚠';
-            } else if (type === 'failed') {
-                className += ' result-failed';
-                title = 'Processing Failed';
-                icon = '✕';
-            }
+                    if (response.ok) {
+                        const receipt = await response.json();
 
-            resultSection.className = className;
-            resultTitle.textContent = icon + ' ' + title;
-
-            let html = `
-                <div class="result-item">
-                    <span class="result-label">Status:</span>
-                    <span class="result-value">${escapeHtml(data.status)}</span>
-                </div>
-                <div class="result-item">
-                    <span class="result-label">Message:</span>
-                    <span class="result-value">${escapeHtml(data.message || '')}</span>
-                </div>
-            `;
-
-            resultContent.innerHTML = html;
-        }
-
-        // Show upload error
-        function showUploadError(message) {
-            resultSection.classList.add('show');
-            resultSection.className = 'result-section show result-failed';
-            resultTitle.textContent = '✕ Error';
-
-            let errorText = message;
-            if (typeof message === 'object') {
-                errorText = 'An error occurred. Please try again.';
-            }
-
-            const html = `
-                <div class="result-item">
-                    <span class="result-label">Error:</span>
-                    <span class="result-value">${escapeHtml(errorText)}</span>
-                </div>
-            `;
-
-            resultContent.innerHTML = html;
-        }
-
-        // Load receipt history
-        async function loadReceiptHistory() {
-            try {
-                const params = new URLSearchParams();
-                params.append('owner', OWNER);
-
-                const status = filterStatus.value;
-                if (status) params.append('status', status);
-
-                const category = filterCategory.value;
-                if (category) params.append('category', category);
-
-                const response = await fetch(`/api/v1/receipts/?${params}`, {
-                    headers: {
-                        'X-Requested-With': 'XMLHttpRequest',
+                        if (['APPROVED', 'REJECTED', 'EXACT_DUPLICATE', 'SEMANTIC_DUPLICATE', 'FAILED'].includes(receipt.status)) {
+                            removeLastMessage();
+                            await handleReceiptResult(receipt);
+                        } else {
+                            attempts++;
+                            if (attempts < maxAttempts) {
+                                setTimeout(poll, 1000);
+                            } else {
+                                removeLastMessage();
+                                appendMessage('assistant', 'Processing timed out. Please refresh and try again.');
+                            }
+                        }
                     }
+                } catch (error) {
+                    console.error('Poll error:', error);
+                }
+            };
+
+            poll();
+        }
+
+        async function handleReceiptResult(receipt) {
+            const category_confidence = receipt.category_confidence || 0;
+
+            if (category_confidence < CATEGORY_CONFIDENCE_THRESHOLD && receipt.status !== 'EXACT_DUPLICATE' && receipt.status !== 'SEMANTIC_DUPLICATE' && receipt.status !== 'FAILED') {
+                appendMessage('assistant', "I couldn't confidently determine the expense category. Please select one:");
+                await loadCategorySelector(receipt.id);
+            } else {
+                displayReceiptResult(receipt);
+            }
+        }
+
+        async function loadCategorySelector(receiptId) {
+            try {
+                const response = await fetch('/api/v1/receipts/categories/', {
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
                 });
 
-                if (!response.ok) {
-                    receiptList.innerHTML = '<div class="empty-state"><p>Unable to load receipts</p></div>';
-                    return;
-                }
+                if (response.ok) {
+                    const data = await response.json();
+                    let html = '<div class="category-selector"><select id="categorySelect"><option value="">Select a category...</option>';
 
-                const data = await response.json();
-                const receipts = Array.isArray(data) ? data : (data.results || []);
-                renderReceiptList(receipts);
+                    (data.categories || []).forEach(cat => {
+                        html += `<option value="${escapeHtml(cat)}">${escapeHtml(cat)}</option>`;
+                    });
+
+                    html += '</select><button onclick="confirmCategory(\'' + receiptId + '\')">Confirm Category</button></div>';
+                    const lastMsg = document.querySelector('.chat-messages .message:last-child .message-bubble');
+                    if (lastMsg) lastMsg.innerHTML += html;
+                }
             } catch (error) {
-                receiptList.innerHTML = '<div class="empty-state"><p>Unable to load receipts</p></div>';
+                appendMessage('assistant', 'Could not load categories. Please refresh the page.');
             }
         }
 
-        // Render receipt list
-        function renderReceiptList(receipts) {
-            if (!receipts || receipts.length === 0) {
-                receiptList.innerHTML = `
-                    <div class="empty-state">
-                        <div class="empty-state-icon">📋</div>
-                        <p>No receipts found</p>
-                    </div>
-                `;
+        async function confirmCategory(receiptId) {
+            const select = document.getElementById('categorySelect');
+            const category = select.value;
+
+            if (!category) {
+                appendMessage('assistant', 'Please select a category.');
                 return;
             }
 
-            let html = receipts.map(receipt => {
-                const statusBadgeClass = `receipt-status-badge status-${receipt.status.toLowerCase()}`;
-                const amount = receipt.total_amount ? `${receipt.currency || ''} ${receipt.total_amount}` : 'N/A';
-                const date = receipt.transaction_date ? formatDate(receipt.transaction_date) : 'N/A';
+            try {
+                const response = await fetch(`/api/v1/receipts/${receiptId}/set_category/?owner=${OWNER}`, {
+                    method: 'POST',
+                    body: JSON.stringify({ category }),
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                });
 
-                return `
-                    <div class="receipt-card">
-                        <div class="receipt-info">
-                            <div class="receipt-filename">${escapeHtml(receipt.original_filename)}</div>
-                            <div class="receipt-meta">
-                                <div class="receipt-meta-item">
-                                    <span class="receipt-meta-label">Vendor:</span>
-                                    <span>${escapeHtml(receipt.vendor_name || 'Unknown')}</span>
-                                </div>
-                                <div class="receipt-meta-item">
-                                    <span class="receipt-meta-label">Amount:</span>
-                                    <span>${escapeHtml(amount)}</span>
-                                </div>
-                                <div class="receipt-meta-item">
-                                    <span class="receipt-meta-label">Date:</span>
-                                    <span>${date}</span>
-                                </div>
-                                <div class="receipt-meta-item">
-                                    <span class="receipt-meta-label">Category:</span>
-                                    <span>${escapeHtml(receipt.category)}</span>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="receipt-actions">
-                            <span class="${statusBadgeClass}">${receipt.status}</span>
-                            <button class="btn-preview" onclick="previewReceipt('${receipt.id}')">👁 Preview</button>
-                            <button class="btn-preview" onclick="viewDetails('${receipt.id}')">📄 Details</button>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-
-            receiptList.innerHTML = html;
+                if (response.ok) {
+                    const receipt = await response.json();
+                    document.querySelector('.category-selector').remove();
+                    displayReceiptResult(receipt);
+                } else {
+                    appendMessage('assistant', 'Failed to save category. Please try again.');
+                }
+            } catch (error) {
+                appendMessage('assistant', `Error: ${escapeHtml(error.message)}`);
+            }
         }
 
-        // Format date
+        function displayReceiptResult(receipt) {
+            let statusClass = 'approved';
+            let statusText = '✅ APPROVED';
+
+            if (receipt.status === 'APPROVED') {
+                statusClass = 'approved';
+                statusText = '✅ APPROVED';
+            } else if (receipt.status === 'REJECTED') {
+                statusClass = 'rejected';
+                statusText = '❌ REJECTED';
+            } else if (receipt.status === 'EXACT_DUPLICATE') {
+                statusClass = 'duplicate';
+                statusText = '⚠️ EXACT DUPLICATE';
+            } else if (receipt.status === 'SEMANTIC_DUPLICATE') {
+                statusClass = 'duplicate';
+                statusText = '⚠️ POSSIBLE DUPLICATE';
+            } else if (receipt.status === 'FAILED') {
+                statusClass = 'rejected';
+                statusText = '❌ FAILED';
+            }
+
+            let html = `<div class="result-card ${statusClass}">`;
+            html += `<div class="result-row"><div class="result-label">Status</div><div class="result-value"><span class="status-badge ${statusClass}">${statusText}</span></div></div>`;
+
+            if (receipt.vendor_name) html += `<div class="result-row"><div class="result-label">Vendor</div><div class="result-value">${escapeHtml(receipt.vendor_name)}</div></div>`;
+            if (receipt.transaction_date) html += `<div class="result-row"><div class="result-label">Date</div><div class="result-value">${formatDate(receipt.transaction_date)}</div></div>`;
+            if (receipt.total_amount) html += `<div class="result-row"><div class="result-label">Amount</div><div class="result-value">${receipt.currency || ''} ${receipt.total_amount}</div></div>`;
+            if (receipt.category) html += `<div class="result-row"><div class="result-label">Category</div><div class="result-value">${escapeHtml(receipt.category)}</div></div>`;
+            if (receipt.processing_message) html += `<div class="result-row"><div class="result-label">Message</div><div class="result-value">${escapeHtml(receipt.processing_message)}</div></div>`;
+
+            html += '</div>';
+            appendMessage('assistant', html);
+            clearFileInput();
+        }
+
+        function appendMessage(role, content) {
+            const container = document.getElementById('chatMessages');
+            const msgDiv = document.createElement('div');
+            msgDiv.className = `message ${role}`;
+            msgDiv.innerHTML = `<div class="message-bubble">${content}</div>`;
+            container.appendChild(msgDiv);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function removeLastMessage() {
+            const messages = document.querySelectorAll('#chatMessages .message');
+            if (messages.length > 0) messages[messages.length - 1].remove();
+        }
+
+        function clearFileInput() {
+            document.getElementById('receiptFile').value = '';
+            document.getElementById('selectedFile').style.display = 'none';
+        }
+
+        function clearChat() {
+            document.getElementById('chatMessages').innerHTML = '';
+            appendMessage('assistant', 'Chat cleared. Ready for a new receipt!');
+            clearFileInput();
+        }
+
         function formatDate(dateStr) {
             if (!dateStr) return 'N/A';
             try {
@@ -906,243 +574,11 @@
             }
         }
 
-        // Preview receipt
-        async function previewReceipt(receiptId) {
-            const previewModal = document.getElementById('previewModal');
-            const previewContent = document.getElementById('previewContent');
-
-            previewContent.innerHTML = '<div class="loading-state"><div class="spinner"></div><p>Loading preview...</p></div>';
-            previewModal.classList.add('show');
-
-            try {
-                const detailsResponse = await fetch(`/api/v1/receipts/${receiptId}/?owner=${OWNER}`, {
-                    headers: {
-                        'X-Requested-With': 'XMLHttpRequest',
-                    }
-                });
-
-                let receiptStatus = null;
-                let isDuplicate = false;
-                if (detailsResponse.ok) {
-                    const receipt = await detailsResponse.json();
-                    receiptStatus = receipt.status;
-                    isDuplicate = receipt.status === 'EXACT_DUPLICATE' || receipt.status === 'SEMANTIC_DUPLICATE';
-                }
-
-                const response = await fetch(`/api/v1/receipts/${receiptId}/preview/?owner=${OWNER}`, {
-                    headers: {
-                        'X-Requested-With': 'XMLHttpRequest',
-                    }
-                });
-
-                if (response.ok) {
-                    const contentType = response.headers.get('content-type') || '';
-                    const blob = await response.blob();
-
-                    let previewHtml = '';
-                    if (isDuplicate) {
-                        previewHtml = '<div style="background: #fef3c7; border: 1px solid #fde047; padding: 12px; border-radius: 4px; margin-bottom: 15px; color: #92400e; font-size: 13px;"><strong>Note:</strong> This receipt is a duplicate. Showing the original uploaded receipt.</div>';
-                    }
-
-                    if (contentType.includes('image/')) {
-                        const url = URL.createObjectURL(blob);
-                        previewHtml += `<img src="${url}" class="preview-image" />`;
-                        previewContent.innerHTML = previewHtml;
-                    } else if (contentType.includes('application/pdf')) {
-                        const url = URL.createObjectURL(blob);
-                        previewHtml += `
-                            <iframe src="${url}" style="width: 100%; height: 600px; border: none; border-radius: 4px;"></iframe>
-                        `;
-                        previewContent.innerHTML = previewHtml;
-                    } else {
-                        previewContent.innerHTML = '<p>Preview not available for this file type.</p>';
-                    }
-                } else {
-                    let errorMsg = 'Unable to load preview.';
-                    try {
-                        const errorData = await response.json();
-                        if (errorData.error) {
-                            errorMsg = escapeHtml(errorData.error);
-                        }
-                    } catch {
-                        if (response.status === 404) {
-                            errorMsg = 'Receipt file not found.';
-                        } else if (response.status === 403) {
-                            errorMsg = 'You do not have permission to view this receipt.';
-                        }
-                    }
-                    previewContent.innerHTML = `<p>${errorMsg}</p>`;
-                }
-            } catch (error) {
-                previewContent.innerHTML = '<p>Failed to load preview. Please try again.</p>';
-            }
-        }
-
-        // View details
-        async function viewDetails(receiptId) {
-            const detailsModal = document.getElementById('detailsModal');
-            const detailsContent = document.getElementById('detailsContent');
-
-            detailsContent.innerHTML = '<div class="loading-state"><div class="spinner"></div><p>Loading details...</p></div>';
-            detailsModal.classList.add('show');
-
-            try {
-                const response = await fetch(`/api/v1/receipts/${receiptId}/?owner=${OWNER}`, {
-                    headers: {
-                        'X-Requested-With': 'XMLHttpRequest',
-                    }
-                });
-
-                if (response.ok) {
-                    const receipt = await response.json();
-                    renderDetails(receipt);
-                } else {
-                    detailsContent.innerHTML = '<p>Unable to load receipt details.</p>';
-                }
-            } catch (error) {
-                detailsContent.innerHTML = '<p>Failed to load details. Please try again.</p>';
-            }
-        }
-
-        // Render details
-        function renderDetails(receipt) {
-            const detailsContent = document.getElementById('detailsContent');
-
-            const formatValue = (value, defaultVal = 'N/A') => {
-                if (value === null || value === undefined || value === '') {
-                    return defaultVal;
-                }
-                return value;
-            };
-
-            let html = `
-                <div class="detail-item">
-                    <div class="detail-label">Status</div>
-                    <div class="detail-value">${escapeHtml(receipt.status)}</div>
-                </div>
-                <div class="detail-item">
-                    <div class="detail-label">Filename</div>
-                    <div class="detail-value">${escapeHtml(formatValue(receipt.original_filename))}</div>
-                </div>
-                <div class="detail-item">
-                    <div class="detail-label">Category</div>
-                    <div class="detail-value">${escapeHtml(formatValue(receipt.category))}</div>
-                </div>
-                <div class="detail-item">
-                    <div class="detail-label">Vendor</div>
-                    <div class="detail-value">${escapeHtml(formatValue(receipt.vendor_name))}</div>
-                </div>
-                <div class="detail-item">
-                    <div class="detail-label">Transaction Date</div>
-                    <div class="detail-value">${receipt.transaction_date ? formatDate(receipt.transaction_date) : 'N/A'}</div>
-                </div>
-                <div class="detail-item">
-                    <div class="detail-label">Total Amount</div>
-                    <div class="detail-value">${formatValue(receipt.currency ? receipt.currency + ' ' + receipt.total_amount : receipt.total_amount)}</div>
-                </div>
-                <div class="detail-item">
-                    <div class="detail-label">Invoice Number</div>
-                    <div class="detail-value">${escapeHtml(formatValue(receipt.invoice_number))}</div>
-                </div>
-                <div class="detail-item">
-                    <div class="detail-label">Payment Method</div>
-                    <div class="detail-value">${escapeHtml(formatValue(receipt.payment_method))}</div>
-                </div>
-            `;
-
-            if (receipt.duplicate_score) {
-                html += `
-                    <div class="detail-item">
-                        <div class="detail-label">Duplicate Score</div>
-                        <div class="detail-value">${receipt.duplicate_score}</div>
-                    </div>
-                `;
-            }
-
-            if (receipt.duplicate_reason) {
-                html += `
-                    <div class="detail-item">
-                        <div class="detail-label">Duplicate Reason</div>
-                        <div class="detail-value">${escapeHtml(receipt.duplicate_reason)}</div>
-                    </div>
-                `;
-            }
-
-            if (receipt.processing_message) {
-                html += `
-                    <div class="detail-item">
-                        <div class="detail-label">Processing Message</div>
-                        <div class="detail-value">${escapeHtml(receipt.processing_message)}</div>
-                    </div>
-                `;
-            }
-
-            if (receipt.policy_status) {
-                html += `
-                    <div class="detail-item">
-                        <div class="detail-label">Policy Status</div>
-                        <div class="detail-value">${escapeHtml(receipt.policy_status)}</div>
-                    </div>
-                `;
-            }
-
-            html += `
-                <div class="detail-item">
-                    <div class="detail-label">Created</div>
-                    <div class="detail-value">${receipt.created_at ? formatDate(receipt.created_at) : 'N/A'}</div>
-                </div>
-                <div class="detail-item">
-                    <div class="detail-label">Updated</div>
-                    <div class="detail-value">${receipt.updated_at ? formatDate(receipt.updated_at) : 'N/A'}</div>
-                </div>
-            `;
-
-            detailsContent.innerHTML = html;
-        }
-
-        // Close modals
-        function closeDetailsModal() {
-            document.getElementById('detailsModal').classList.remove('show');
-        }
-
-        function closePreviewModal() {
-            document.getElementById('previewModal').classList.remove('show');
-        }
-
-        // Close modal on outside click
-        window.addEventListener('click', (e) => {
-            const detailsModal = document.getElementById('detailsModal');
-            const previewModal = document.getElementById('previewModal');
-
-            if (e.target === detailsModal) {
-                detailsModal.classList.remove('show');
-            }
-            if (e.target === previewModal) {
-                previewModal.classList.remove('show');
-            }
-        });
-
-        // Filter change handlers
-        filterStatus.addEventListener('change', loadReceiptHistory);
-        filterCategory.addEventListener('change', loadReceiptHistory);
-
-        // Escape key to close modals
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-                document.getElementById('detailsModal').classList.remove('show');
-                document.getElementById('previewModal').classList.remove('show');
-            }
-        });
-
-        // Escape HTML
         function escapeHtml(text) {
             const div = document.createElement('div');
             div.textContent = text;
             return div.innerHTML;
         }
-
-        // Initial load
-        loadReceiptHistory();
     </script>
 </body>
 </html>

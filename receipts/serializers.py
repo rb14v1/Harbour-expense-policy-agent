@@ -7,8 +7,9 @@ class ReceiptDetailSerializer(serializers.ModelSerializer):
         model = Receipt
         fields = [
             'id', 'status', 'original_filename', 'vendor_name', 'transaction_date',
-            'total_amount', 'currency', 'category', 'duplicate_score', 'duplicate_reason',
-            'processing_message', 'policy_status', 'policy_result_json', 'created_at', 'updated_at'
+            'total_amount', 'currency', 'category', 'category_confidence', 'category_reason',
+            'duplicate_score', 'duplicate_reason', 'processing_message', 'policy_status',
+            'policy_result_json', 'created_at', 'updated_at'
         ]
         read_only_fields = fields
 

@@ -107,7 +107,10 @@ class ReceiptService:
             receipt.normalized_json = normalized
             receipt.status = "NORMALIZED"
 
-            receipt.category = self.determine_category(extracted)
+            category_result = self.determine_category(extracted)
+            receipt.category = category_result.get('category', 'Other')
+            receipt.category_confidence = category_result.get('confidence', 0.0)
+            receipt.category_reason = category_result.get('reason', '')
 
             # Populate Receipt model from normalized data
             if normalized.get('vendor_name'):
@@ -193,15 +196,147 @@ class ReceiptService:
         return receipt
 
     @staticmethod
-    def determine_category(extracted: dict) -> str:
+    def determine_category(extracted: dict) -> dict:
         """
-        Determine receipt category based on extracted data.
+        Determine receipt category with confidence score.
 
-        Currently returns 'Other' as default.
-        Full 45-category detection logic will be implemented separately
-        to map merchant names and line items to the authoritative category master.
+        Returns dict:
+        {
+            'category': 'Category Name',
+            'confidence': 0.0-1.0,
+            'reason': 'Why this category was selected'
+        }
+
+        Confidence >= 0.80 suggests automatic assignment.
+        Confidence < 0.80 suggests user confirmation needed.
         """
-        return 'Other'
+        if not extracted:
+            return {
+                'category': 'Other',
+                'confidence': 0.0,
+                'reason': 'No receipt data available'
+            }
+
+        merchant_name = (extracted.get('merchant', {}).get('name') or '').lower()
+        line_items = extracted.get('line_items', [])
+        line_items_desc = ' '.join([str(item.get('description', '')).lower() for item in line_items])
+        payment_method = (extracted.get('payment', {}).get('method') or '').lower()
+        all_text = merchant_name + ' ' + line_items_desc + ' ' + payment_method
+
+        category_keywords = {
+            'Accommodation/Hotel': {
+                'keywords': ['hotel', 'motel', 'resort', 'airbnb', 'lodging', 'inn', 'accommodation'],
+                'confidence_boost': 0.95
+            },
+            'Transport: Flights': {
+                'keywords': ['airline', 'flight', 'aircraft', 'airfare', 'aviation'],
+                'confidence_boost': 0.90
+            },
+            'Transport: Luas/Bus/Train': {
+                'keywords': ['train', 'railway', 'luas', 'bus', 'transit', 'metro'],
+                'confidence_boost': 0.85
+            },
+            'Transport: Taxis/Cab/Uber': {
+                'keywords': ['taxi', 'uber', 'lyft', 'cab', 'ride share'],
+                'confidence_boost': 0.90
+            },
+            'Transport: Car Rental & Fuel': {
+                'keywords': ['car rental', 'rental', 'hertz', 'enterprise', 'avis'],
+                'confidence_boost': 0.90
+            },
+            'Software': {
+                'keywords': ['software', 'subscription', 'saas', 'cloud', 'license', 'app store', 'microsoft', 'adobe'],
+                'confidence_boost': 0.85
+            },
+            'Food: Dinner - Max Claim: €/$/AUD 45 / INR700': {
+                'keywords': ['restaurant', 'dinner', 'dinner time'],
+                'confidence_boost': 0.85
+            },
+            'Food: Breakfast or Lunch - Max Claim: €/$/AUD 15 / INR700': {
+                'keywords': ['breakfast', 'lunch', 'cafe', 'coffee', 'bistro', 'pizzeria', 'bakery'],
+                'confidence_boost': 0.80
+            },
+            'Stationery Consumables': {
+                'keywords': ['stationery', 'office supplies', 'paper', 'pen', 'ink', 'supplies'],
+                'confidence_boost': 0.80
+            },
+            'Training': {
+                'keywords': ['training', 'course', 'workshop', 'seminar', 'education'],
+                'confidence_boost': 0.85
+            },
+            'Phone Bills/Broadband': {
+                'keywords': ['phone', 'mobile', 'broadband', 'internet', 'vodafone', 'telstra', 'telecom'],
+                'confidence_boost': 0.85
+            },
+            'Bank Charges': {
+                'keywords': ['bank', 'banking fee', 'overdraft', 'wire transfer fee'],
+                'confidence_boost': 0.80
+            },
+            'Client Entertainment': {
+                'keywords': ['entertainment', 'movie', 'cinema', 'theatre', 'theater', 'bar', 'lounge', 'club'],
+                'confidence_boost': 0.80
+            },
+            'Computer Peripherals': {
+                'keywords': ['mouse', 'keyboard', 'monitor', 'laptop', 'computer', 'hardware'],
+                'confidence_boost': 0.80
+            },
+            'Travel Other incl. Parking & Tolls': {
+                'keywords': ['parking', 'toll', 'petrol station', 'gas station'],
+                'confidence_boost': 0.85
+            },
+            'Print & Postage': {
+                'keywords': ['print', 'postage', 'shipping', 'courier', 'post office'],
+                'confidence_boost': 0.80
+            },
+            'Prepaid Flights': {
+                'keywords': ['flight booking', 'airline booking', 'ticket booking'],
+                'confidence_boost': 0.85
+            },
+            'Prepaid Accommodation': {
+                'keywords': ['hotel booking', 'accommodation booking', 'airbnb booking'],
+                'confidence_boost': 0.85
+            },
+            'Prepaid Car Rental & Fuel': {
+                'keywords': ['car rental booking', 'fuel prepaid'],
+                'confidence_boost': 0.85
+            }
+        }
+
+        best_match = None
+        best_confidence = 0.0
+        match_reason = ''
+        all_text_words = all_text.split()
+
+        for category, config in category_keywords.items():
+            for keyword in config['keywords']:
+                keyword_words = keyword.split()
+                match_found = False
+
+                if len(keyword_words) == 1:
+                    match_found = keyword_words[0] in all_text_words
+                else:
+                    match_found = keyword in all_text
+
+                if match_found:
+                    confidence = config['confidence_boost']
+                    if confidence > best_confidence:
+                        best_confidence = confidence
+                        best_match = category
+                        match_reason = f"Matched keyword '{keyword}' in receipt details"
+                    break
+
+        if best_match and best_confidence >= 0.75:
+            return {
+                'category': best_match,
+                'confidence': best_confidence,
+                'reason': match_reason
+            }
+
+        return {
+            'category': 'Other',
+            'confidence': 0.5,
+            'reason': 'No reliable category match found'
+        }
 
     @staticmethod
     def _is_valid_receipt(extracted: dict) -> bool:

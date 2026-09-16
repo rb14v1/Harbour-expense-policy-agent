@@ -92,6 +92,8 @@ class Receipt(models.Model):
     currency = models.CharField(max_length=3, null=True, blank=True, db_index=True)
     payment_method = models.CharField(max_length=255, null=True, blank=True)
     category = models.CharField(max_length=100, choices=CATEGORY_CHOICES, default='Other', db_index=True)
+    category_confidence = models.FloatField(default=0.0, null=True, blank=True)
+    category_reason = models.TextField(null=True, blank=True)
 
     normalized_json = models.JSONField(null=True, blank=True)
     raw_document_intelligence_json = models.JSONField(null=True, blank=True)
