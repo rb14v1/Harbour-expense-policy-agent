@@ -278,6 +278,101 @@ class PolicyServiceTests(TestCase):
         self.assertFalse(result['rules'][0]['passed'])
 
 
+class CategoryMasterTests(TestCase):
+    def test_all_45_categories_exist(self):
+        expected_categories = [
+            'Accommodation/Hotel',
+            'Australia - Mileage (KM) - electric vehicle',
+            'Australia - Mileage (KM)- Petrol or diesel vehicle',
+            'Bank Charges',
+            'Client Entertainment',
+            'Computer Peripherals',
+            'Food: Breakfast or Lunch - Max Claim: €/$/AUD 15 / INR700',
+            'Food: Dinner - Max Claim: €/$/AUD 45 / INR700',
+            'Food: Per Diem - Max Claim: €/$/AUD 45 / INR 4000',
+            'India - Mileage (KM) - electric vehicle - four wheeler',
+            'India - Mileage (KM) - Petrol or diesel vehicle - four wheeler',
+            'India - Mileage (KM) - Petrol or diesel vehicle - two wheeler',
+            'India - Mileage (KM)- electric vehicle - two wheeler',
+            'Other',
+            'Phone Bills/Broadband',
+            'Prepaid Accommodation',
+            'Prepaid Car Rental & Fuel',
+            'Prepaid Flights',
+            'Prepaid Luas/Bus/Train',
+            'Prepaid Other',
+            'Print & Postage',
+            'ROI - Mileage (KM) - electric vehicle - Lower Mileage Rate',
+            'ROI - Mileage (KM) - electric vehicle - Upper Mileage Rate',
+            'ROI - Mileage (KM) - Petrol or diesel vehicle - Lower Mileage Rate',
+            'ROI - Mileage (KM) - Petrol or diesel vehicle - Upper Mileage Rate',
+            'Slovenia - Mileage (KM) - electric vehicle - Residential',
+            'Slovenia - Mileage (KM) - Petrol or diesel vehicle - Non-Residential',
+            'Slovenia - Mileage (KM) - Petrol or diesel vehicle - Residential',
+            'Slovenia - Mileage (KM)- electric vehicle - Non-Residential',
+            'Software',
+            'Spain - Mileage (KM) - electric vehicle',
+            'Spain - Mileage (KM)- Petrol or diesel vehicle',
+            'Stationery Consumables',
+            'Training',
+            'Transport: Car Rental & Fuel',
+            'Transport: Flights',
+            'Transport: Luas/Bus/Train',
+            'Transport: Taxis/Cab/Uber',
+            'Travel Other incl. Parking & Tolls',
+            'UK - Mileage (miles) - electric vehicle - Lower Mileage Rate',
+            'UK - Mileage (miles) - electric vehicle - Upper Mileage Rate',
+            'UK - Mileage (miles) - Petrol or diesel vehicle - Lower Mileage Rate',
+            'UK - Mileage (miles) - Petrol or diesel vehicle - Upper Mileage Rate',
+            'USA - Mileage (miles) - electric vehicle',
+            'USA - Mileage (miles)- Petrol or diesel vehicle',
+        ]
+
+        actual_categories = [choice[0] for choice in Receipt.CATEGORY_CHOICES]
+        self.assertEqual(len(actual_categories), 45)
+        self.assertEqual(sorted(actual_categories), sorted(expected_categories))
+
+    def test_other_is_default_category(self):
+        receipt = Receipt.objects.create(
+            owner="test",
+            original_filename="test.pdf",
+            blob_name="receipts/test/uuid/test.pdf",
+            mime_type="application/pdf",
+            file_size=1000,
+            sha256_hash="abc123",
+        )
+        self.assertEqual(receipt.category, 'Other')
+
+    def test_receipt_accepts_all_45_categories(self):
+        categories = [choice[0] for choice in Receipt.CATEGORY_CHOICES]
+        for i, category in enumerate(categories):
+            receipt = Receipt.objects.create(
+                owner="test",
+                original_filename=f"test{i}.pdf",
+                blob_name=f"receipts/test/uuid{i}/test{i}.pdf",
+                mime_type="application/pdf",
+                file_size=1000,
+                sha256_hash=f"hash{i}",
+                category=category,
+            )
+            self.assertEqual(receipt.category, category)
+
+    def test_old_9_categories_not_in_choices(self):
+        old_categories = [
+            'Accommodation',
+            'Meals',
+            'Travel',
+            'Transportation',
+            'Car Rental',
+            'Fuel',
+            'Office Supplies',
+        ]
+
+        actual_categories = [choice[0] for choice in Receipt.CATEGORY_CHOICES]
+        for old_cat in old_categories:
+            self.assertNotIn(old_cat, actual_categories)
+
+
 class ReceiptListSerializerTests(TestCase):
     def test_receipt_list_includes_category(self):
         receipt = Receipt.objects.create(

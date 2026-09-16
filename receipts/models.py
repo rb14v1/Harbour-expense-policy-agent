@@ -23,15 +23,51 @@ class Receipt(models.Model):
     ]
 
     CATEGORY_CHOICES = [
-        ('Accommodation', 'Accommodation'),
-        ('Meals', 'Meals'),
-        ('Travel', 'Travel'),
-        ('Transportation', 'Transportation'),
-        ('Car Rental', 'Car Rental'),
-        ('Fuel', 'Fuel'),
+        ('Accommodation/Hotel', 'Accommodation/Hotel'),
+        ('Australia - Mileage (KM) - electric vehicle', 'Australia - Mileage (KM) - electric vehicle'),
+        ('Australia - Mileage (KM)- Petrol or diesel vehicle', 'Australia - Mileage (KM)- Petrol or diesel vehicle'),
+        ('Bank Charges', 'Bank Charges'),
         ('Client Entertainment', 'Client Entertainment'),
-        ('Office Supplies', 'Office Supplies'),
+        ('Computer Peripherals', 'Computer Peripherals'),
+        ('Food: Breakfast or Lunch - Max Claim: €/$/AUD 15 / INR700', 'Food: Breakfast or Lunch - Max Claim: €/$/AUD 15 / INR700'),
+        ('Food: Dinner - Max Claim: €/$/AUD 45 / INR700', 'Food: Dinner - Max Claim: €/$/AUD 45 / INR700'),
+        ('Food: Per Diem - Max Claim: €/$/AUD 45 / INR 4000', 'Food: Per Diem - Max Claim: €/$/AUD 45 / INR 4000'),
+        ('India - Mileage (KM) - electric vehicle - four wheeler', 'India - Mileage (KM) - electric vehicle - four wheeler'),
+        ('India - Mileage (KM) - Petrol or diesel vehicle - four wheeler', 'India - Mileage (KM) - Petrol or diesel vehicle - four wheeler'),
+        ('India - Mileage (KM) - Petrol or diesel vehicle - two wheeler', 'India - Mileage (KM) - Petrol or diesel vehicle - two wheeler'),
+        ('India - Mileage (KM)- electric vehicle - two wheeler', 'India - Mileage (KM)- electric vehicle - two wheeler'),
         ('Other', 'Other'),
+        ('Phone Bills/Broadband', 'Phone Bills/Broadband'),
+        ('Prepaid Accommodation', 'Prepaid Accommodation'),
+        ('Prepaid Car Rental & Fuel', 'Prepaid Car Rental & Fuel'),
+        ('Prepaid Flights', 'Prepaid Flights'),
+        ('Prepaid Luas/Bus/Train', 'Prepaid Luas/Bus/Train'),
+        ('Prepaid Other', 'Prepaid Other'),
+        ('Print & Postage', 'Print & Postage'),
+        ('ROI - Mileage (KM) - electric vehicle - Lower Mileage Rate', 'ROI - Mileage (KM) - electric vehicle - Lower Mileage Rate'),
+        ('ROI - Mileage (KM) - electric vehicle - Upper Mileage Rate', 'ROI - Mileage (KM) - electric vehicle - Upper Mileage Rate'),
+        ('ROI - Mileage (KM) - Petrol or diesel vehicle - Lower Mileage Rate', 'ROI - Mileage (KM) - Petrol or diesel vehicle - Lower Mileage Rate'),
+        ('ROI - Mileage (KM) - Petrol or diesel vehicle - Upper Mileage Rate', 'ROI - Mileage (KM) - Petrol or diesel vehicle - Upper Mileage Rate'),
+        ('Slovenia - Mileage (KM) - electric vehicle - Residential', 'Slovenia - Mileage (KM) - electric vehicle - Residential'),
+        ('Slovenia - Mileage (KM) - Petrol or diesel vehicle - Non-Residential', 'Slovenia - Mileage (KM) - Petrol or diesel vehicle - Non-Residential'),
+        ('Slovenia - Mileage (KM) - Petrol or diesel vehicle - Residential', 'Slovenia - Mileage (KM) - Petrol or diesel vehicle - Residential'),
+        ('Slovenia - Mileage (KM)- electric vehicle - Non-Residential', 'Slovenia - Mileage (KM)- electric vehicle - Non-Residential'),
+        ('Software', 'Software'),
+        ('Spain - Mileage (KM) - electric vehicle', 'Spain - Mileage (KM) - electric vehicle'),
+        ('Spain - Mileage (KM)- Petrol or diesel vehicle', 'Spain - Mileage (KM)- Petrol or diesel vehicle'),
+        ('Stationery Consumables', 'Stationery Consumables'),
+        ('Training', 'Training'),
+        ('Transport: Car Rental & Fuel', 'Transport: Car Rental & Fuel'),
+        ('Transport: Flights', 'Transport: Flights'),
+        ('Transport: Luas/Bus/Train', 'Transport: Luas/Bus/Train'),
+        ('Transport: Taxis/Cab/Uber', 'Transport: Taxis/Cab/Uber'),
+        ('Travel Other incl. Parking & Tolls', 'Travel Other incl. Parking & Tolls'),
+        ('UK - Mileage (miles) - electric vehicle - Lower Mileage Rate', 'UK - Mileage (miles) - electric vehicle - Lower Mileage Rate'),
+        ('UK - Mileage (miles) - electric vehicle - Upper Mileage Rate', 'UK - Mileage (miles) - electric vehicle - Upper Mileage Rate'),
+        ('UK - Mileage (miles) - Petrol or diesel vehicle - Lower Mileage Rate', 'UK - Mileage (miles) - Petrol or diesel vehicle - Lower Mileage Rate'),
+        ('UK - Mileage (miles) - Petrol or diesel vehicle - Upper Mileage Rate', 'UK - Mileage (miles) - Petrol or diesel vehicle - Upper Mileage Rate'),
+        ('USA - Mileage (miles) - electric vehicle', 'USA - Mileage (miles) - electric vehicle'),
+        ('USA - Mileage (miles)- Petrol or diesel vehicle', 'USA - Mileage (miles)- Petrol or diesel vehicle'),
     ]
 
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -55,7 +91,7 @@ class Receipt(models.Model):
     total_amount = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, db_index=True)
     currency = models.CharField(max_length=3, null=True, blank=True, db_index=True)
     payment_method = models.CharField(max_length=255, null=True, blank=True)
-    category = models.CharField(max_length=50, choices=CATEGORY_CHOICES, default='Other', db_index=True)
+    category = models.CharField(max_length=100, choices=CATEGORY_CHOICES, default='Other', db_index=True)
 
     normalized_json = models.JSONField(null=True, blank=True)
     raw_document_intelligence_json = models.JSONField(null=True, blank=True)

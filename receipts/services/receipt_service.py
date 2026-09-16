@@ -194,30 +194,13 @@ class ReceiptService:
 
     @staticmethod
     def determine_category(extracted: dict) -> str:
-        """Determine receipt category based on extracted data."""
-        if not extracted:
-            return 'Other'
+        """
+        Determine receipt category based on extracted data.
 
-        merchant_name = extracted.get('merchant', {}).get('name', '').lower()
-        line_items_desc = ' '.join([str(item.get('description', '')).lower() for item in extracted.get('line_items', [])]) if extracted.get('line_items') else ''
-        all_text = merchant_name + ' ' + line_items_desc
-
-        category_keywords = {
-            'Accommodation': ['hotel', 'motel', 'resort', 'airbnb', 'hostel', 'lodging', 'inn'],
-            'Meals': ['restaurant', 'cafe', 'coffee', 'food', 'lunch', 'dinner', 'breakfast', 'bistro', 'pizzeria', 'bakery'],
-            'Travel': ['airline', 'flight', 'train', 'railway', 'ticket'],
-            'Transportation': ['taxi', 'uber', 'lyft', 'bus', 'metro', 'parking', 'toll'],
-            'Car Rental': ['rental', 'hertz', 'enterprise', 'avis', 'car rental'],
-            'Fuel': ['gas station', 'petrol', 'fuel', 'diesel', 'shell', 'bp', 'exxon'],
-            'Client Entertainment': ['entertainment', 'movie', 'cinema', 'bar', 'lounge', 'night club'],
-            'Office Supplies': ['office', 'stationery', 'supplies', 'paper', 'pen', 'ink'],
-        }
-
-        for category, keywords in category_keywords.items():
-            for keyword in keywords:
-                if keyword in all_text:
-                    return category
-
+        Currently returns 'Other' as default.
+        Full 45-category detection logic will be implemented separately
+        to map merchant names and line items to the authoritative category master.
+        """
         return 'Other'
 
     @staticmethod
