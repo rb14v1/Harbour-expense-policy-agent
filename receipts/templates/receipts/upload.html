@@ -799,7 +799,8 @@
                     return;
                 }
 
-                const receipts = await response.json();
+                const data = await response.json();
+                const receipts = Array.isArray(data) ? data : (data.results || []);
                 renderReceiptList(receipts);
             } catch (error) {
                 receiptList.innerHTML = '<div class="empty-state"><p>Unable to load receipts</p></div>';
