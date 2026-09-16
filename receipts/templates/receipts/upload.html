@@ -886,13 +886,13 @@
                 });
 
                 if (response.ok) {
+                    const contentType = response.headers.get('content-type') || '';
                     const blob = await response.blob();
-                    const contentType = response.headers.get('content-type');
 
-                    if (contentType.startsWith('image/')) {
+                    if (contentType.includes('image/')) {
                         const url = URL.createObjectURL(blob);
                         previewContent.innerHTML = `<img src="${url}" class="preview-image" />`;
-                    } else if (contentType === 'application/pdf') {
+                    } else if (contentType.includes('application/pdf')) {
                         const url = URL.createObjectURL(blob);
                         previewContent.innerHTML = `
                             <iframe src="${url}" style="width: 100%; height: 600px; border: none; border-radius: 4px;"></iframe>
@@ -901,7 +901,20 @@
                         previewContent.innerHTML = '<p>Preview not available for this file type.</p>';
                     }
                 } else {
-                    previewContent.innerHTML = '<p>Unable to load preview.</p>';
+                    let errorMsg = 'Unable to load preview.';
+                    try {
+                        const errorData = await response.json();
+                        if (errorData.error) {
+                            errorMsg = escapeHtml(errorData.error);
+                        }
+                    } catch {
+                        if (response.status === 404) {
+                            errorMsg = 'Receipt file not found.';
+                        } else if (response.status === 403) {
+                            errorMsg = 'You do not have permission to view this receipt.';
+                        }
+                    }
+                    previewContent.innerHTML = `<p>${errorMsg}</p>`;
                 }
             } catch (error) {
                 previewContent.innerHTML = '<p>Failed to load preview. Please try again.</p>';

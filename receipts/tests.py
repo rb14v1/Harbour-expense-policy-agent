@@ -458,3 +458,56 @@ class ReceiptPreviewTests(TestCase):
         client = Client()
         response = client.get(f'/api/v1/receipts/{receipt.id}/preview/?owner=default-user')
         self.assertEqual(response.status_code, 404)
+
+    def test_receipt_preview_successful_pdf_response(self):
+        from django.test import Client
+        from unittest.mock import patch
+
+        pdf_content = (
+            b"%PDF-1.4\n"
+            b"%\xE2\xE3\xCF\xD3\n"
+            b"1 0 obj\n"
+            b"<</Type/Catalog/Pages 2 0 R>>\n"
+            b"endobj\n"
+        )
+
+        receipt = Receipt.objects.create(
+            owner="preview-test",
+            original_filename="test.pdf",
+            blob_name="receipts/preview-test/uuid/test.pdf",
+            mime_type="application/pdf",
+            file_size=len(pdf_content),
+            sha256_hash="abc123preview",
+        )
+
+        client = Client()
+        with patch('receipts.views.BlobService.download') as mock_download:
+            mock_download.return_value = pdf_content
+            response = client.get(f'/api/v1/receipts/{receipt.id}/preview/?owner=preview-test')
+
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response['Content-Type'], 'application/pdf')
+            self.assertIn('inline', response['Content-Disposition'])
+
+    def test_receipt_preview_blob_error_returns_json_error(self):
+        from django.test import Client
+        from unittest.mock import patch
+        from receipts.exceptions import BlobUploadError
+
+        receipt = Receipt.objects.create(
+            owner="error-test",
+            original_filename="receipt.pdf",
+            blob_name="receipts/error-test/uuid/nonexistent.pdf",
+            mime_type="application/pdf",
+            file_size=1000,
+            sha256_hash="error123",
+        )
+
+        client = Client()
+        with patch('receipts.views.BlobService.download') as mock_download:
+            mock_download.side_effect = BlobUploadError("Blob not found")
+            response = client.get(f'/api/v1/receipts/{receipt.id}/preview/?owner=error-test')
+
+            self.assertEqual(response.status_code, 404)
+            data = response.json()
+            self.assertIn('error', data)
