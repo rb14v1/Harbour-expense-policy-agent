@@ -619,7 +619,8 @@
         }
 
         async function uploadSingleReceipt(file) {
-            appendMessage('assistant', `<div class="loading"><span>Processing ${escapeHtml(file.name)}...</span><div class="spinner"></div></div>`);
+            const processingMsgId = `processing-${Date.now()}-${Math.random()}`;
+            appendMessage('assistant', `<div id="${processingMsgId}" class="loading"><span>Processing ${escapeHtml(file.name)}...</span><div class="spinner"></div></div>`);
 
             try {
                 const formData = new FormData();
@@ -637,9 +638,10 @@
                     const receiptId = data.receipt_id;
 
                     if (data.status === 'EXACT_DUPLICATE') {
+                        removeProcessingMessage(processingMsgId);
                         appendMessage('assistant', `⚠️ ${escapeHtml(file.name)}: ${escapeHtml(data.message)}`);
                     } else {
-                        await pollReceiptStatus(receiptId, file.name);
+                        await pollReceiptStatus(receiptId, file.name, processingMsgId);
                     }
                 } else {
                     let errorMessage = 'Upload failed. Please try again.';
@@ -657,14 +659,16 @@
                     } catch (parseError) {
                         // Response wasn't JSON or parsing failed; use fallback
                     }
+                    removeProcessingMessage(processingMsgId);
                     appendMessage('assistant', `❌ ${escapeHtml(file.name)}: ${errorMessage}`);
                 }
             } catch (error) {
+                removeProcessingMessage(processingMsgId);
                 appendMessage('assistant', `❌ ${escapeHtml(file.name)}: Error - ${escapeHtml(error.message)}`);
             }
         }
 
-        async function pollReceiptStatus(receiptId, fileName) {
+        async function pollReceiptStatus(receiptId, fileName, processingMsgId) {
             const maxAttempts = 30;
             let attempts = 0;
 
@@ -679,13 +683,14 @@
                             const receipt = await response.json();
 
                             if (['APPROVED', 'REJECTED', 'EXACT_DUPLICATE', 'SEMANTIC_DUPLICATE', 'FAILED'].includes(receipt.status)) {
-                                await handleReceiptResult(receipt, fileName);
+                                await handleReceiptResult(receipt, fileName, processingMsgId);
                                 resolve();
                             } else {
                                 attempts++;
                                 if (attempts < maxAttempts) {
                                     setTimeout(poll, 1000);
                                 } else {
+                                    removeProcessingMessage(processingMsgId);
                                     appendMessage('assistant', `⏱️ Processing of ${escapeHtml(fileName)} timed out. Please refresh and try again.`);
                                     resolve();
                                 }
@@ -701,8 +706,8 @@
             });
         }
 
-        async function handleReceiptResult(receipt, fileName) {
-            removeLastMessage();
+        async function handleReceiptResult(receipt, fileName, processingMsgId) {
+            removeProcessingMessage(processingMsgId);
             const category_confidence = receipt.category_confidence || 0;
 
             if (category_confidence < CATEGORY_CONFIDENCE_THRESHOLD && receipt.status !== 'EXACT_DUPLICATE' && receipt.status !== 'SEMANTIC_DUPLICATE' && receipt.status !== 'FAILED') {
@@ -838,6 +843,13 @@
             msgDiv.innerHTML = `<div class="message-bubble">${content}</div>`;
             container.appendChild(msgDiv);
             container.scrollTop = container.scrollHeight;
+        }
+
+        function removeProcessingMessage(msgId) {
+            const element = document.getElementById(msgId);
+            if (element) {
+                element.closest('.message').remove();
+            }
         }
 
         function removeLastMessage() {

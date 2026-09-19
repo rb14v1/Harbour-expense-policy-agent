@@ -354,8 +354,13 @@ async def finance_tab():
 <body>
     <div class="dashboard-container">
         <header class="dashboard-header">
-            <h1>📊 Finance Department - Receipt Review Dashboard</h1>
-            <p>Review and manage all submitted expense receipts</p>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <h1>📊 Finance Department - Receipt Review Dashboard</h1>
+                    <p>Review and manage all submitted expense receipts</p>
+                </div>
+                <button id="uploadButton" class="btn btn-primary" style="margin-top: 0; white-space: nowrap;">📤 Upload Receipt</button>
+            </div>
         </header>
 
         <section class="filter-section">
@@ -565,6 +570,18 @@ async def finance_tab():
         </div>
     </div>
 
+    <div id="uploadModal" class="modal" style="display: none;">
+        <div class="modal-content" style="max-width: 1000px; height: 80vh;">
+            <div class="modal-header">
+                <h2>💰 Upload Receipt</h2>
+                <button class="modal-close" onclick="closeUploadModal()">✕</button>
+            </div>
+            <div class="modal-body" style="overflow-y: auto; height: 100%;">
+                <iframe id="uploadFrame" src="/upload/" style="width: 100%; height: 100%; border: none; border-radius: 4px;"></iframe>
+            </div>
+        </div>
+    </div>
+
     <script>
         const API_BASE = '/finance/api';
         let currentPage = 1;
@@ -608,8 +625,9 @@ async def finance_tab():
             document.getElementById('nextPageBtn').addEventListener('click', () => {
                 currentPage++; loadReceipts();
             });
+            document.getElementById('uploadButton').addEventListener('click', showUploadModal);
             document.addEventListener('keydown', (e) => {
-                if (e.key === 'Escape') { closeDetailsModal(); closePreviewModal(); }
+                if (e.key === 'Escape') { closeDetailsModal(); closePreviewModal(); closeUploadModal(); }
             });
         }
 
@@ -874,6 +892,8 @@ async def finance_tab():
         function closeDetailsModal() { document.getElementById('detailsModal').style.display = 'none'; }
         function showPreviewModal() { document.getElementById('previewModal').style.display = 'flex'; }
         function closePreviewModal() { document.getElementById('previewModal').style.display = 'none'; }
+        function showUploadModal() { document.getElementById('uploadModal').style.display = 'flex'; }
+        function closeUploadModal() { document.getElementById('uploadModal').style.display = 'none'; }
 
         function clearFilters() {
             document.getElementById('statusFilter').value = '';
