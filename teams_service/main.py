@@ -254,9 +254,10 @@ async def finance_receipt_preview(receipt_id: str):
             response = await client.get(
                 f"{config.DJANGO_API_URL}/receipts/{receipt_id}/preview/?owner=finance-department"
             )
-            response.raise_for_status()
+            # Pass through the Django response (including errors) as-is
             return Response(
                 content=response.content,
+                status_code=response.status_code,
                 media_type=response.headers.get("content-type", "application/octet-stream")
             )
     except Exception as e:
