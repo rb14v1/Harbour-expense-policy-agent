@@ -702,6 +702,7 @@
         }
 
         async function handleReceiptResult(receipt, fileName) {
+            removeLastMessage();
             const category_confidence = receipt.category_confidence || 0;
 
             if (category_confidence < CATEGORY_CONFIDENCE_THRESHOLD && receipt.status !== 'EXACT_DUPLICATE' && receipt.status !== 'SEMANTIC_DUPLICATE' && receipt.status !== 'FAILED') {
