@@ -609,8 +609,6 @@
                 appendMessage('user', attachmentHtml);
             });
 
-            appendMessage('assistant', `<div class="loading"><span>Processing ${filesToProcess.length} receipt${filesToProcess.length !== 1 ? 's' : ''}...</span><div class="spinner"></div></div>`);
-
             for (const file of filesToProcess) {
                 await uploadSingleReceipt(file);
             }
@@ -621,6 +619,8 @@
         }
 
         async function uploadSingleReceipt(file) {
+            appendMessage('assistant', `<div class="loading"><span>Processing ${escapeHtml(file.name)}...</span><div class="spinner"></div></div>`);
+
             try {
                 const formData = new FormData();
                 formData.append('file', file);
@@ -637,13 +637,11 @@
                     const receiptId = data.receipt_id;
 
                     if (data.status === 'EXACT_DUPLICATE') {
-                        removeLastMessage();
                         appendMessage('assistant', `⚠️ ${escapeHtml(file.name)}: ${escapeHtml(data.message)}`);
                     } else {
                         await pollReceiptStatus(receiptId, file.name);
                     }
                 } else {
-                    removeLastMessage();
                     let errorMessage = 'Upload failed. Please try again.';
                     try {
                         const errorData = await response.json();
@@ -662,7 +660,6 @@
                     appendMessage('assistant', `❌ ${escapeHtml(file.name)}: ${errorMessage}`);
                 }
             } catch (error) {
-                removeLastMessage();
                 appendMessage('assistant', `❌ ${escapeHtml(file.name)}: Error - ${escapeHtml(error.message)}`);
             }
         }
@@ -682,7 +679,6 @@
                             const receipt = await response.json();
 
                             if (['APPROVED', 'REJECTED', 'EXACT_DUPLICATE', 'SEMANTIC_DUPLICATE', 'FAILED'].includes(receipt.status)) {
-                                removeLastMessage();
                                 await handleReceiptResult(receipt, fileName);
                                 resolve();
                             } else {
@@ -690,8 +686,7 @@
                                 if (attempts < maxAttempts) {
                                     setTimeout(poll, 1000);
                                 } else {
-                                    removeLastMessage();
-                                    appendMessage('assistant', `Processing of ${escapeHtml(fileName)} timed out. Please refresh and try again.`);
+                                    appendMessage('assistant', `⏱️ Processing of ${escapeHtml(fileName)} timed out. Please refresh and try again.`);
                                     resolve();
                                 }
                             }
