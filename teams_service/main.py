@@ -577,7 +577,7 @@ async def finance_tab():
                 <button class="modal-close" onclick="closeUploadModal()">✕</button>
             </div>
             <div class="modal-body" style="overflow-y: auto; height: 100%;">
-                <iframe id="uploadFrame" src="/upload/" style="width: 100%; height: 100%; border: none; border-radius: 4px;"></iframe>
+                <iframe id="uploadFrame" src="http://127.0.0.1:8000/upload/" style="width: 100%; height: 100%; border: none; border-radius: 4px;"></iframe>
             </div>
         </div>
     </div>
