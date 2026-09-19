@@ -13,9 +13,11 @@ ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1').split('
 INSTALLED_APPS = [
     'django.contrib.contenttypes',
     'django.contrib.auth',
+    'django.contrib.staticfiles',
     'rest_framework',
     'corsheaders',
     'receipts',
+    'finance',
 ]
 
 MIDDLEWARE = [
@@ -84,10 +86,16 @@ REST_FRAMEWORK = {
 
 CORS_ALLOWED_ORIGINS = os.getenv('CORS_ALLOWED_ORIGINS', 'http://localhost:3000').split(',')
 
-MAX_RECEIPT_UPLOAD_MB = int(os.getenv('MAX_RECEIPT_UPLOAD_MB', '20'))
+MAX_RECEIPT_UPLOAD_MB = int(os.getenv('MAX_RECEIPT_UPLOAD_MB', '5'))
 RECEIPT_MAX_AGE_DAYS = int(os.getenv('RECEIPT_MAX_AGE_DAYS', '35'))
 DUPLICATE_SCORE_THRESHOLD = int(os.getenv('DUPLICATE_SCORE_THRESHOLD', '90'))
 REVIEW_SCORE_THRESHOLD = int(os.getenv('REVIEW_SCORE_THRESHOLD', '75'))
+
+# Django upload limits - allow files larger than application limit so we can return proper error
+# Default Django values are ~2.5MB each, which reject large files before our validation
+# Set to 10MB to allow our application validation (5MB limit) to handle the error response
+FILE_UPLOAD_MAX_MEMORY_SIZE = int(os.getenv('FILE_UPLOAD_MAX_MEMORY_SIZE', '10485760'))
+DATA_UPLOAD_MAX_MEMORY_SIZE = int(os.getenv('DATA_UPLOAD_MAX_MEMORY_SIZE', '10485760'))
 
 AZURE_STORAGE_CONNECTION_STRING = os.getenv('AZURE_STORAGE_CONNECTION_STRING')
 AZURE_STORAGE_CONTAINER_NAME = os.getenv('AZURE_STORAGE_CONTAINER_NAME', 'receipts')
@@ -100,6 +108,12 @@ CELERY_RESULT_BACKEND = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
+
+# Teams / Azure Entra Configuration
+TEAMS_APP_ID = os.getenv('CLIENT_ID', '')
+TEAMS_APP_PASSWORD = os.getenv('CLIENT_SECRET', '')
+TENANT_ID = os.getenv('TENANT_ID', '')
+TEAMS_SERVICE_URL = os.getenv('TEAMS_SERVICE_URL', 'https://smba.trafficmanager.net/apis/')
 
 LOGGING = {
     'version': 1,

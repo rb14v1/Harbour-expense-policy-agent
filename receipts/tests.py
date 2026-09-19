@@ -78,14 +78,14 @@ class FileValidationServiceTests(TestCase):
         file = SimpleUploadedFile("receipt.pdf", pdf_content, content_type="application/pdf")
         with self.assertRaises(UnsupportedFileTypeError) as ctx:
             FileValidationService.validate(file, "receipt.pdf")
-        self.assertIn("obj", str(ctx.exception).lower())
+        self.assertIn("corrupted", str(ctx.exception).lower())
 
     def test_pdf_missing_eof(self):
         pdf_content = b"%PDF-1.4\n" + (b"x" * 150) + b"\n1 0 obj\n<</Type/Catalog>>\nendobj\n"
         file = SimpleUploadedFile("receipt.pdf", pdf_content, content_type="application/pdf")
         with self.assertRaises(UnsupportedFileTypeError) as ctx:
             FileValidationService.validate(file, "receipt.pdf")
-        self.assertIn("eof", str(ctx.exception).lower())
+        self.assertIn("corrupted", str(ctx.exception).lower())
 
     def test_invalid_jpeg_header(self):
         file = SimpleUploadedFile("receipt.jpg", b"NOTAJPG" + b"content", content_type="image/jpeg")
@@ -911,3 +911,283 @@ class ReceiptPreviewTests(TestCase):
             self.assertEqual(response.status_code, 200)
             self.assertEqual(response['Content-Type'], 'application/pdf')
             mock_download.assert_called_with('receipts/reject-test/uuid/receipt.pdf')
+
+
+class UploadErrorHandlingTests(TestCase):
+    """Tests for error message propagation in upload flow."""
+
+    def test_empty_file_error(self):
+        """Empty file should return specific error message."""
+        from django.test import Client
+        client = Client()
+        
+        file = SimpleUploadedFile("empty.pdf", b"", content_type="application/pdf")
+        response = client.post(
+            '/api/v1/receipts/upload/',
+            {'file': file, 'owner': 'test-user'},
+            format='multipart'
+        )
+        
+        self.assertEqual(response.status_code, 400)
+        data = response.json()
+        self.assertIn('errors', data)
+        self.assertIn('file', data['errors'])
+        self.assertTrue(any('empty' in str(err).lower() for err in data['errors']['file']))
+
+    def test_unsupported_extension_error(self):
+        """Unsupported file extension should return specific error."""
+        from django.test import Client
+        client = Client()
+        
+        file = SimpleUploadedFile("receipt.txt", b"not a receipt", content_type="text/plain")
+        response = client.post(
+            '/api/v1/receipts/upload/',
+            {'file': file, 'owner': 'test-user'},
+            format='multipart'
+        )
+        
+        self.assertEqual(response.status_code, 400)
+        data = response.json()
+        self.assertIn('errors', data)
+        self.assertIn('file', data['errors'])
+        error_msg = str(data['errors']['file'][0]).lower()
+        self.assertIn('unsupported', error_msg)
+
+    def test_file_too_large_error(self):
+        """File exceeding 20MB should return size-specific error."""
+        from django.test import Client
+        
+        client = Client()
+        large_pdf = b"%PDF-1.4\n" + (b"x" * (21 * 1024 * 1024))
+        file = SimpleUploadedFile("huge.pdf", large_pdf, content_type="application/pdf")
+        
+        response = client.post(
+            '/api/v1/receipts/upload/',
+            {'file': file, 'owner': 'test-user'},
+            format='multipart'
+        )
+        
+        self.assertEqual(response.status_code, 400)
+        data = response.json()
+        self.assertIn('errors', data)
+        error_msg = str(data['errors']['file'][0]).lower()
+        self.assertIn('too large', error_msg)
+
+    def test_invalid_pdf_header_error(self):
+        """Invalid PDF header should return specific error."""
+        from django.test import Client
+        client = Client()
+        
+        file = SimpleUploadedFile("notpdf.pdf", b"This is not a PDF", content_type="application/pdf")
+        response = client.post(
+            '/api/v1/receipts/upload/',
+            {'file': file, 'owner': 'test-user'},
+            format='multipart'
+        )
+        
+        self.assertEqual(response.status_code, 400)
+        data = response.json()
+        self.assertIn('errors', data)
+        error_msg = str(data['errors']['file'][0]).lower()
+        self.assertIn('pdf', error_msg)
+
+    def test_blank_image_error(self):
+        """Mostly white image should return blank-specific error."""
+        from django.test import Client
+        from PIL import Image
+        import io
+        
+        client = Client()
+        
+        img = Image.new('RGB', (100, 100), color=(255, 255, 255))
+        img_bytes = io.BytesIO()
+        img.save(img_bytes, format='PNG')
+        img_bytes.seek(0)
+        
+        file = SimpleUploadedFile("blank.png", img_bytes.read(), content_type="image/png")
+        response = client.post(
+            '/api/v1/receipts/upload/',
+            {'file': file, 'owner': 'test-user'},
+            format='multipart'
+        )
+        
+        self.assertEqual(response.status_code, 400)
+        data = response.json()
+        self.assertIn('errors', data)
+        error_msg = str(data['errors']['file'][0]).lower()
+        self.assertIn('blank', error_msg)
+
+    def test_pdf_zero_pages_error(self):
+        """PDF with zero pages should return empty PDF error."""
+        from django.test import Client
+        client = Client()
+        
+        pdf_content = (
+            b"%PDF-1.4\n"
+            b"1 0 obj\n"
+            b"<</Type/Catalog/Pages 2 0 R>>\n"
+            b"endobj\n"
+            b"2 0 obj\n"
+            b"<</Type/Pages/Kids[]/Count 0>>\n"
+            b"endobj\n"
+            b"xref\n"
+            b"0 3\n"
+            b"0000000000 65535 f\n"
+            b"0000000009 00000 n\n"
+            b"0000000074 00000 n\n"
+            b"trailer\n"
+            b"<</Size 3/Root 1 0 R>>\n"
+            b"startxref\n"
+            b"127\n"
+            b"%%EOF"
+        )
+        file = SimpleUploadedFile("empty.pdf", pdf_content, content_type="application/pdf")
+        response = client.post(
+            '/api/v1/receipts/upload/',
+            {'file': file, 'owner': 'test-user'},
+            format='multipart'
+        )
+        
+        self.assertEqual(response.status_code, 400)
+        data = response.json()
+        self.assertIn('errors', data)
+        error_msg = str(data['errors']['file'][0]).lower()
+        self.assertIn('zero pages', error_msg.lower())
+
+    def test_ocr_failure_sets_failed_status(self):
+        """OCR failure should set FAILED status with clear message."""
+        from unittest.mock import patch
+        from receipts.services import ReceiptService
+        from receipts.exceptions import DocumentExtractionError
+        
+        pdf_content = (
+            b"%PDF-1.4\n"
+            b"%\xE2\xE3\xCF\xD3\n"
+            b"1 0 obj\n"
+            b"<</Type/Catalog/Pages 2 0 R>>\n"
+            b"endobj\n"
+            b"2 0 obj\n"
+            b"<</Type/Pages/Kids[3 0 R]/Count 1>>\n"
+            b"endobj\n"
+            b"3 0 obj\n"
+            b"<</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]>>\n"
+            b"endobj\n"
+            b"xref\n"
+            b"0 4\n"
+            b"0000000000 65535 f\n"
+            b"0000000009 00000 n\n"
+            b"0000000074 00000 n\n"
+            b"0000000133 00000 n\n"
+            b"trailer\n"
+            b"<</Size 4/Root 1 0 R>>\n"
+            b"startxref\n"
+            b"190\n"
+            b"%%EOF"
+        )
+        
+        receipt = Receipt.objects.create(
+            owner='test-user',
+            original_filename='test.pdf',
+            blob_name='receipts/test-user/uuid/test.pdf',
+            mime_type='application/pdf',
+            file_size=len(pdf_content),
+            sha256_hash='testhash123',
+            status='QUEUED_FOR_OCR'
+        )
+        
+        service = ReceiptService()
+        with patch.object(service.blob_service, 'download', return_value=pdf_content):
+            with patch.object(service.doc_intel_service, 'analyze_receipt') as mock_analyze:
+                mock_analyze.side_effect = DocumentExtractionError("OCR service unavailable")
+                
+                result = service.process_receipt(str(receipt.id))
+        
+        self.assertEqual(result.status, 'FAILED')
+        self.assertIn('couldn\'t read', result.processing_message.lower())
+        self.assertIn('blurry', result.processing_message.lower())
+
+
+class FileSizeLimit5MBTests(TestCase):
+    """Tests for 5 MB file size limit."""
+
+    def test_file_5mb_accepted(self):
+        """File exactly 5 MB should be accepted."""
+        from django.test import Client
+        
+        client = Client()
+        pdf_5mb = b"%PDF-1.4\n" + (b"x" * (5 * 1024 * 1024 - 20))
+        file = SimpleUploadedFile("receipt_5mb.pdf", pdf_5mb, content_type="application/pdf")
+        
+        response = client.post(
+            '/api/v1/receipts/upload/',
+            {'file': file, 'owner': 'test-user'},
+            format='multipart'
+        )
+        
+        # Should not return file size error
+        if response.status_code == 400:
+            data = response.json()
+            error_msg = str(data.get('errors', {}).get('file', [''])[0]).lower()
+            self.assertNotIn('too large', error_msg, "5 MB file should not be rejected as too large")
+        else:
+            # Accepted successfully
+            self.assertIn(response.status_code, [201, 200])
+
+    def test_file_above_5mb_rejected(self):
+        """File above 5 MB should be rejected."""
+        from django.test import Client
+        
+        client = Client()
+        pdf_6mb = b"%PDF-1.4\n" + (b"x" * (6 * 1024 * 1024))
+        file = SimpleUploadedFile("huge.pdf", pdf_6mb, content_type="application/pdf")
+        
+        response = client.post(
+            '/api/v1/receipts/upload/',
+            {'file': file, 'owner': 'test-user'},
+            format='multipart'
+        )
+        
+        self.assertEqual(response.status_code, 400)
+        data = response.json()
+        self.assertIn('errors', data)
+        error_msg = str(data['errors']['file'][0]).lower()
+        self.assertIn('too large', error_msg)
+        self.assertIn('5', error_msg)  # Should mention 5 MB
+
+    def test_file_5mb_plus_1_rejected(self):
+        """File just over 5 MB should be rejected."""
+        from django.test import Client
+        
+        client = Client()
+        pdf_51mb = b"%PDF-1.4\n" + (b"x" * ((5 * 1024 * 1024) + 1024))
+        file = SimpleUploadedFile("slightly_over.pdf", pdf_51mb, content_type="application/pdf")
+        
+        response = client.post(
+            '/api/v1/receipts/upload/',
+            {'file': file, 'owner': 'test-user'},
+            format='multipart'
+        )
+        
+        self.assertEqual(response.status_code, 400)
+        error_msg = str(response.json()['errors']['file'][0]).lower()
+        self.assertIn('too large', error_msg)
+
+    def test_file_above_5mb_no_receipt_created(self):
+        """File above 5 MB should not create a Receipt."""
+        from django.test import Client
+        
+        client = Client()
+        pdf_6mb = b"%PDF-1.4\n" + (b"x" * (6 * 1024 * 1024))
+        file = SimpleUploadedFile("huge.pdf", pdf_6mb, content_type="application/pdf")
+        
+        receipts_before = Receipt.objects.count()
+        
+        response = client.post(
+            '/api/v1/receipts/upload/',
+            {'file': file, 'owner': 'test-user'},
+            format='multipart'
+        )
+        
+        receipts_after = Receipt.objects.count()
+        self.assertEqual(receipts_before, receipts_after, "No receipt should be created for oversized file")
+        self.assertEqual(response.status_code, 400)

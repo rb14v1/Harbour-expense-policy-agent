@@ -9,7 +9,7 @@ from receipts.services.document_intelligence_service import DocumentIntelligence
 from receipts.services.normalization_service import NormalizationService
 from receipts.services.duplicate_service import DuplicateService
 from receipts.services.policy_service import PolicyService
-from receipts.exceptions import BlobUploadError
+from receipts.exceptions import BlobUploadError, DocumentExtractionError
 
 
 class ReceiptService:
@@ -74,10 +74,21 @@ class ReceiptService:
 
             file_bytes = self.blob_service.download(receipt.blob_name)
 
-            extracted = self.doc_intel_service.analyze_receipt(
-                content=file_bytes,
-                content_type=receipt.mime_type,
-            )
+            try:
+                extracted = self.doc_intel_service.analyze_receipt(
+                    content=file_bytes,
+                    content_type=receipt.mime_type,
+                )
+            except DocumentExtractionError as e:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"OCR extraction failed for receipt {receipt_id}: {str(e)}")
+                receipt.status = "FAILED"
+                receipt.duplicate_reason = f"Document extraction failed: {str(e)}"
+                receipt.processing_message = "We couldn't read the receipt. The document may be blurry, unclear, or contain unreadable content. Please upload a clearer image or PDF."
+                receipt.save()
+                return receipt
+
             receipt.raw_document_intelligence_json = extracted
             receipt.status = "EXTRACTED"
             receipt.save()

@@ -4,6 +4,7 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
 from teams_app.bot_handler import create_teams_bot
+from teams_app.finance_tab import create_finance_tab_handler
 from teams_app.auth import require_teams_auth, validate_teams_activity
 
 logger = logging.getLogger(__name__)
@@ -103,3 +104,23 @@ def teams_health_check(request):
         "service": "Expense Policy Agent Teams Bot",
         "version": "1.0.0"
     }, status=status.HTTP_200_OK)
+
+
+@api_view(['GET'])
+def finance_tab_config(request):
+    """
+    Get Finance Tab configuration for Teams.
+    Called by Teams to configure the Finance Review tab.
+    """
+    try:
+        handler = create_finance_tab_handler()
+        config = handler.get_tab_config()
+
+        return Response(config, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        logger.error(f"Error getting Finance Tab config: {str(e)}")
+        return Response(
+            {"error": str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )

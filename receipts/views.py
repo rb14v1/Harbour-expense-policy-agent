@@ -54,6 +54,10 @@ class ReceiptViewSet(viewsets.ReadOnlyModelViewSet):
             if vendor_filter:
                 queryset = queryset.filter(vendor_name__icontains=vendor_filter)
 
+            filename_filter = self.request.query_params.get('filename')
+            if filename_filter:
+                queryset = queryset.filter(original_filename__icontains=filename_filter)
+
             date_from = self.request.query_params.get('date_from')
             if date_from:
                 queryset = queryset.filter(transaction_date__gte=date_from)
@@ -61,6 +65,14 @@ class ReceiptViewSet(viewsets.ReadOnlyModelViewSet):
             date_to = self.request.query_params.get('date_to')
             if date_to:
                 queryset = queryset.filter(transaction_date__lte=date_to)
+
+            amount_min = self.request.query_params.get('amount_min')
+            if amount_min:
+                queryset = queryset.filter(total_amount__gte=amount_min)
+
+            amount_max = self.request.query_params.get('amount_max')
+            if amount_max:
+                queryset = queryset.filter(total_amount__lte=amount_max)
 
         return queryset
 
@@ -108,7 +120,7 @@ class ReceiptViewSet(viewsets.ReadOnlyModelViewSet):
 
         except ReceiptAppException as e:
             return Response(
-                {'error': str(e)},
+                {'errors': {'file': [str(e)]}},
                 status=status.HTTP_400_BAD_REQUEST
             )
         except Exception as e:
@@ -135,7 +147,8 @@ class ReceiptViewSet(viewsets.ReadOnlyModelViewSet):
         receipt = self.get_object()
         owner = request.query_params.get('owner', 'default-user')
 
-        if receipt.owner != owner:
+        # Allow finance-department to preview all receipts (reviewer role)
+        if owner != 'finance-department' and receipt.owner != owner:
             return Response(
                 {'error': 'Unauthorized'},
                 status=status.HTTP_403_FORBIDDEN
@@ -146,7 +159,7 @@ class ReceiptViewSet(viewsets.ReadOnlyModelViewSet):
         if not receipt.blob_name:
             if receipt.status == 'EXACT_DUPLICATE' and receipt.exact_duplicate_of:
                 original = receipt.exact_duplicate_of
-                if original.owner != owner:
+                if owner != 'finance-department' and original.owner != owner:
                     return Response(
                         {'error': 'Unauthorized'},
                         status=status.HTTP_403_FORBIDDEN
@@ -154,7 +167,7 @@ class ReceiptViewSet(viewsets.ReadOnlyModelViewSet):
                 preview_receipt = original
             elif receipt.status == 'SEMANTIC_DUPLICATE' and receipt.semantic_duplicate_of:
                 original = receipt.semantic_duplicate_of
-                if original.owner != owner:
+                if owner != 'finance-department' and original.owner != owner:
                     return Response(
                         {'error': 'Unauthorized'},
                         status=status.HTTP_403_FORBIDDEN

@@ -1,6 +1,7 @@
 from django.conf import settings
 from receipts.exceptions import UnsupportedFileTypeError, ReceiptTooLargeError
 from PIL import Image
+from pypdf import PdfReader
 import io
 
 
@@ -58,39 +59,20 @@ def _validate_pdf(file_obj, file_header: bytes) -> None:
 
     file_obj.seek(0)
     try:
-        content = file_obj.read()
+        reader = PdfReader(file_obj)
+
+        if len(reader.pages) == 0:
+            raise UnsupportedFileTypeError(
+                "PDF contains zero pages. Cannot process empty PDF."
+            )
+
         file_obj.seek(0)
 
-        if len(content) < 100:
-            raise UnsupportedFileTypeError(
-                "PDF file is too small to be valid."
-            )
-
-        if b'endobj' not in content:
-            raise UnsupportedFileTypeError(
-                "PDF does not contain valid PDF objects."
-            )
-
-        if b'%%EOF' not in content:
-            raise UnsupportedFileTypeError(
-                "PDF does not end with proper EOF marker."
-            )
-
-        if b'/Pages' not in content:
-            raise UnsupportedFileTypeError(
-                "PDF does not contain page definitions. This appears to be a blank or corrupted PDF."
-            )
-
-        if b'/Type' not in content and b'/Catalog' not in content:
-            raise UnsupportedFileTypeError(
-                "PDF does not contain required catalog. This appears to be a blank or corrupted PDF."
-            )
-
+    except UnsupportedFileTypeError:
+        raise
     except Exception as e:
-        if isinstance(e, UnsupportedFileTypeError):
-            raise
         raise UnsupportedFileTypeError(
-            f"PDF validation failed: {str(e)}"
+            f"PDF is corrupted or malformed: {str(e)}"
         )
 
 

@@ -840,35 +840,9 @@ async def finance_tab():
 
         function previewCurrentReceipt() {
             if (!currentReceipt) return;
-            showPreviewModal();
-            loadPreview(currentReceipt);
-        }
-
-        function loadPreview(receiptId) {
-            const url = '/finance/api/receipts/' + receiptId + '/preview/';
-            document.getElementById('previewLoading').style.display = 'block';
-            document.getElementById('previewContent').style.display = 'none';
-            document.getElementById('previewError').style.display = 'none';
-            const xhr = new XMLHttpRequest();
-            xhr.onreadystatechange = function() {
-                if (xhr.readyState === 4) {
-                    if (xhr.status === 200) {
-                        const blob = xhr.response;
-                        const blobUrl = URL.createObjectURL(blob);
-                        document.getElementById('previewLoading').style.display = 'none';
-                        document.getElementById('previewContent').style.display = 'block';
-                        const iframe = document.getElementById('previewFrame');
-                        iframe.src = blobUrl;
-                    } else {
-                        document.getElementById('previewLoading').style.display = 'none';
-                        document.getElementById('previewError').style.display = 'block';
-                        document.getElementById('previewErrorMessage').textContent = 'Unable to load preview. The receipt file may no longer be available.';
-                    }
-                }
-            };
-            xhr.responseType = 'blob';
-            xhr.open('GET', url, true);
-            xhr.send();
+            // Open the preview directly using HTTP URL, not blob URL
+            // Teams/Browser handles the Content-Type natively
+            window.open(`/finance/api/receipts/${currentReceipt}/preview/`, '_blank');
         }
 
         function showLoadingState() {

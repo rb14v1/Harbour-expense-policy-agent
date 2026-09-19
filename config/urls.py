@@ -5,4 +5,5 @@ urlpatterns = [
     path('upload/', upload_form_view, name='upload-form'),
     path('api/v1/', include('receipts.urls')),
     path('api/v1/teams/', include('teams_app.urls')),
+    path('finance/', include('finance.urls')),
 ]
