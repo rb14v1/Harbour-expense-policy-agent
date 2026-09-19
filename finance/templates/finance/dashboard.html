@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Finance Department - Receipt Review Dashboard</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'finance/dashboard.css' %}">
+</head>
+<body>
+    <div class="dashboard-container">
+        <header class="dashboard-header">
+            <h1>📊 Finance Department - Receipt Review Dashboard</h1>
+            <p>Review and manage all submitted expense receipts</p>
+        </header>
+
+        <div class="dashboard-content">
+            <!-- Filter Section -->
+            <section class="filter-section">
+                <div class="filter-header">
+                    <h2>Search and Filter</h2>
+                </div>
+
+                <div class="filter-grid">
+                    <div class="filter-group">
+                        <label for="statusFilter">Status</label>
+                        <select id="statusFilter" class="filter-input">
+                            <option value="">All Statuses</option>
+                            <option value="APPROVED">Approved</option>
+                            <option value="REJECTED">Rejected</option>
+                            <option value="EXACT_DUPLICATE">Exact Duplicate</option>
+                            <option value="SEMANTIC_DUPLICATE">Semantic Duplicate</option>
+                            <option value="UNIQUE">Unique</option>
+                            <option value="OCR_FAILED">OCR Failed</option>
+                        </select>
+                    </div>
+
+                    <div class="filter-group">
+                        <label for="categoryFilter">Category</label>
+                        <select id="categoryFilter" class="filter-input">
+                            <option value="">All Categories</option>
+                        </select>
+                    </div>
+
+                    <div class="filter-group">
+                        <label for="vendorSearch">Vendor</label>
+                        <input type="text" id="vendorSearch" class="filter-input" placeholder="Search vendor...">
+                    </div>
+
+                    <div class="filter-group">
+                        <label for="filenameSearch">Filename</label>
+                        <input type="text" id="filenameSearch" class="filter-input" placeholder="Search filename...">
+                    </div>
+
+                    <div class="filter-group">
+                        <label for="dateFromFilter">Date From</label>
+                        <input type="date" id="dateFromFilter" class="filter-input">
+                    </div>
+
+                    <div class="filter-group">
+                        <label for="dateToFilter">Date To</label>
+                        <input type="date" id="dateToFilter" class="filter-input">
+                    </div>
+
+                    <div class="filter-group">
+                        <label for="amountMinFilter">Amount Min</label>
+                        <input type="number" id="amountMinFilter" class="filter-input" placeholder="0.00" step="0.01">
+                    </div>
+
+                    <div class="filter-group">
+                        <label for="amountMaxFilter">Amount Max</label>
+                        <input type="number" id="amountMaxFilter" class="filter-input" placeholder="0.00" step="0.01">
+                    </div>
+                </div>
+
+                <div class="filter-actions">
+                    <button id="searchButton" class="btn btn-primary">🔍 Search</button>
+                    <button id="clearButton" class="btn btn-secondary">✕ Clear Filters</button>
+                </div>
+            </section>
+
+            <!-- Results Section -->
+            <section class="results-section">
+                <div class="results-header">
+                    <h2>Receipts</h2>
+                    <span id="resultCount" class="result-count">Loading...</span>
+                </div>
+
+                <div id="loadingState" class="state-message loading-state">
+                    <div class="spinner"></div>
+                    <p>Loading receipts...</p>
+                </div>
+
+                <div id="emptyState" class="state-message empty-state" style="display: none;">
+                    <p>📭 No receipts found. Try adjusting your filters.</p>
+                </div>
+
+                <div id="errorState" class="state-message error-state" style="display: none;">
+                    <p id="errorMessage">An error occurred while loading receipts.</p>
+                </div>
+
+                <div id="receiptsTable" class="receipts-table" style="display: none;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Filename</th>
+                                <th>Vendor</th>
+                                <th>Date</th>
+                                <th>Amount</th>
+                                <th>Category</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="receiptsBody">
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Pagination -->
+                <div id="paginationControls" class="pagination-controls" style="display: none;">
+                    <button id="prevPageBtn" class="btn btn-small">← Previous</button>
+                    <span id="pageIndicator" class="page-indicator">Page 1</span>
+                    <button id="nextPageBtn" class="btn btn-small">Next →</button>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <!-- Details Modal -->
+    <div id="detailsModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Receipt Details</h2>
+                <button class="modal-close" onclick="closeDetailsModal()">✕</button>
+            </div>
+
+            <div class="modal-body">
+                <div id="detailsLoading" class="modal-loading">
+                    <div class="spinner"></div>
+                    <p>Loading details...</p>
+                </div>
+
+                <div id="detailsContent" style="display: none;">
+                    <!-- Receipt Information Section -->
+                    <div class="details-section">
+                        <h3>Receipt Information</h3>
+                        <div class="details-grid">
+                            <div class="detail-item">
+                                <span class="detail-label">Filename</span>
+                                <span id="detail-filename" class="detail-value">—</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Vendor</span>
+                                <span id="detail-vendor" class="detail-value">—</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Transaction Date</span>
+                                <span id="detail-date" class="detail-value">—</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Amount</span>
+                                <span id="detail-amount" class="detail-value">—</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Currency</span>
+                                <span id="detail-currency" class="detail-value">—</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Invoice Number</span>
+                                <span id="detail-invoice" class="detail-value">—</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Payment Method</span>
+                                <span id="detail-payment" class="detail-value">—</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Category Section -->
+                    <div class="details-section">
+                        <h3>Category</h3>
+                        <div class="details-grid">
+                            <div class="detail-item">
+                                <span class="detail-label">Category</span>
+                                <span id="detail-category" class="detail-value">—</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Confidence</span>
+                                <span id="detail-confidence" class="detail-value">—</span>
+                            </div>
+                            <div class="detail-item full-width">
+                                <span class="detail-label">Reason</span>
+                                <span id="detail-reason" class="detail-value">—</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Processing Section -->
+                    <div class="details-section">
+                        <h3>Processing Information</h3>
+                        <div class="details-grid">
+                            <div class="detail-item">
+                                <span class="detail-label">Status</span>
+                                <span id="detail-status" class="detail-value status-badge">—</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Processing Message</span>
+                                <span id="detail-message" class="detail-value">—</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Duplicate Section (conditionally shown) -->
+                    <div id="duplicateSection" class="details-section" style="display: none;">
+                        <h3>Duplicate Information</h3>
+                        <div class="details-grid">
+                            <div class="detail-item">
+                                <span class="detail-label">Duplicate Type</span>
+                                <span id="detail-duptype" class="detail-value">—</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Duplicate Score</span>
+                                <span id="detail-dupscore" class="detail-value">—</span>
+                            </div>
+                            <div class="detail-item full-width">
+                                <span class="detail-label">Duplicate Reason</span>
+                                <span id="detail-dupreason" class="detail-value">—</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Policy Section (conditionally shown) -->
+                    <div id="policySection" class="details-section" style="display: none;">
+                        <h3>Policy Information</h3>
+                        <div class="details-grid">
+                            <div class="detail-item">
+                                <span class="detail-label">Policy Status</span>
+                                <span id="detail-polstatus" class="detail-value status-badge">—</span>
+                            </div>
+                            <div id="policyRulesContainer" class="detail-item full-width" style="display: none;">
+                                <span class="detail-label">Policy Rules</span>
+                                <div id="detail-polrules" class="detail-value policy-rules">—</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Timestamps -->
+                    <div class="details-section">
+                        <h3>Timestamps</h3>
+                        <div class="details-grid">
+                            <div class="detail-item">
+                                <span class="detail-label">Created</span>
+                                <span id="detail-created" class="detail-value">—</span>
+                            </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Updated</span>
+                                <span id="detail-updated" class="detail-value">—</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Decision Section (conditionally shown) -->
+                    <div id="decisionSection" class="details-section" style="display: none;">
+                        <h3>Finance Decision</h3>
+                        <div class="decision-buttons">
+                            <button class="btn btn-primary" onclick="showApproveForm()">✅ Approve</button>
+                            <button class="btn btn-danger" onclick="showRejectForm()">❌ Reject</button>
+                        </div>
+
+                        <div id="approveForm" style="display: none; margin-top: 15px;">
+                            <div class="decision-form">
+                                <label for="approveNotes">Notes (optional)</label>
+                                <textarea id="approveNotes" class="form-textarea" placeholder="Add approval notes..."></textarea>
+                                <div class="form-actions">
+                                    <button class="btn btn-primary" onclick="submitApproval()">Submit Approval</button>
+                                    <button class="btn btn-secondary" onclick="hideDecisionForms()">Cancel</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="rejectForm" style="display: none; margin-top: 15px;">
+                            <div class="decision-form">
+                                <label for="rejectNotes">Reason for rejection (required)</label>
+                                <textarea id="rejectNotes" class="form-textarea" placeholder="Explain why this receipt is rejected..." required></textarea>
+                                <div class="form-actions">
+                                    <button class="btn btn-danger" onclick="submitRejection()">Submit Rejection</button>
+                                    <button class="btn btn-secondary" onclick="hideDecisionForms()">Cancel</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="details-actions">
+                        <button id="previewBtn" class="btn btn-primary" onclick="previewCurrentReceipt()">📄 Preview Receipt</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Preview Modal -->
+    <div id="previewModal" class="modal" style="display: none;">
+        <div class="modal-content preview-modal">
+            <div class="modal-header">
+                <h2>Receipt Preview</h2>
+                <button class="modal-close" onclick="closePreviewModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <div id="previewLoading" class="modal-loading">
+                    <div class="spinner"></div>
+                    <p>Loading preview...</p>
+                </div>
+                <div id="previewContent" style="display: none;">
+                    <iframe id="previewFrame" style="width: 100%; height: 600px; border: none; border-radius: 4px;"></iframe>
+                </div>
+                <div id="previewError" class="state-message error-state" style="display: none;">
+                    <p id="previewErrorMessage">Unable to load preview.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{% static 'finance/dashboard.js' %}"></script>
+</body>
+</html>

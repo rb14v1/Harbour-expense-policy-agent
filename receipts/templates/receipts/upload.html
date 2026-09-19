@@ -375,6 +375,76 @@
         .field-group:last-child {
             margin-bottom: 0;
         }
+
+        .selected-files-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+            background: #f9f9f9;
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 12px;
+        }
+
+        .selected-file-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px;
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+
+        .selected-file-item-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex: 1;
+        }
+
+        .selected-file-item-name {
+            color: #333;
+            font-weight: 500;
+            word-break: break-word;
+            max-width: 400px;
+        }
+
+        .selected-file-item-size {
+            color: #999;
+            font-size: 11px;
+            white-space: nowrap;
+        }
+
+        .remove-file-btn {
+            padding: 4px 8px;
+            background: #fee2e2;
+            color: #991b1b;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: 600;
+            transition: background 0.2s;
+            white-space: nowrap;
+        }
+
+        .remove-file-btn:hover {
+            background: #fecaca;
+        }
+
+        .file-count {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
     </style>
 </head>
 <body>
@@ -393,58 +463,164 @@
         </div>
 
         <div class="chat-input-area">
-            <div class="file-input-wrapper">
-                <label for="receiptFile" class="file-input-label">
-                    📎 Choose receipt
+            <div class="file-input-wrapper" style="flex: 1;">
+                <label for="receiptFiles" class="file-input-label">
+                    📎 Choose receipts
                 </label>
-                <input type="file" id="receiptFile" accept=".pdf,.jpg,.jpeg,.png" />
+                <input type="file" id="receiptFiles" accept=".pdf,.jpg,.jpeg,.png" multiple />
             </div>
-            <button class="send-button" id="uploadButton" onclick="uploadReceipt()">Send</button>
+            <button class="send-button" id="uploadButton" onclick="uploadReceipts()">Send</button>
             <button class="clear-button" id="clearButton" onclick="clearChat()">New</button>
         </div>
 
-        <div class="selected-file" id="selectedFile" style="display: none;"></div>
+        <div id="selectedFilesList" class="selected-files-list" style="display: none;"></div>
     </div>
 
     <script>
         const OWNER = 'default-user';
         const CATEGORY_CONFIDENCE_THRESHOLD = 0.80;
+        const MAX_FILE_SIZE_MB = 5;
+        let selectedFiles = [];
 
-        document.getElementById('receiptFile').addEventListener('change', function(e) {
-            const file = this.files[0];
-            if (file) {
-                const fileDiv = document.getElementById('selectedFile');
-                fileDiv.textContent = `Selected: ${escapeHtml(file.name)} (${(file.size / 1024 / 1024).toFixed(2)} MB)`;
-                fileDiv.style.display = 'block';
-            }
+        document.getElementById('receiptFiles').addEventListener('change', function(e) {
+            const newFiles = Array.from(this.files);
+
+            newFiles.forEach(file => {
+                if (!selectedFiles.some(f => f.name === file.name && f.size === file.size)) {
+                    selectedFiles.push(file);
+                }
+            });
+
+            updateSelectedFilesList();
         });
 
-        async function uploadReceipt() {
-            const fileInput = document.getElementById('receiptFile');
-            if (!fileInput.files.length) {
-                appendMessage('assistant', 'Please select a receipt file first.');
+        function updateSelectedFilesList() {
+            const container = document.getElementById('selectedFilesList');
+
+            if (selectedFiles.length === 0) {
+                container.style.display = 'none';
                 return;
             }
 
-            const file = fileInput.files[0];
-            const maxSizeBytes = 20 * 1024 * 1024;
-            if (file.size > maxSizeBytes) {
-                appendMessage('assistant', 'File size exceeds 20 MB limit. Please choose a smaller file.');
+            container.innerHTML = '';
+            selectedFiles.forEach((file, index) => {
+                const fileSize = (file.size / 1024 / 1024).toFixed(2);
+                const fileItem = document.createElement('div');
+                fileItem.className = 'selected-file-item';
+                fileItem.innerHTML = `
+                    <div class="selected-file-item-info">
+                        <span class="selected-file-item-name">📄 ${escapeHtml(file.name)}</span>
+                        <span class="selected-file-item-size">${fileSize} MB</span>
+                    </div>
+                    <button type="button" class="remove-file-btn" onclick="removeFile(${index})">Remove</button>
+                `;
+                container.appendChild(fileItem);
+            });
+
+            container.style.display = 'flex';
+        }
+
+        function removeFile(index) {
+            selectedFiles.splice(index, 1);
+            updateSelectedFilesList();
+
+            if (selectedFiles.length === 0) {
+                document.getElementById('receiptFiles').value = '';
+            }
+        }
+
+        function _formatErrorMessage(backendError) {
+            if (!backendError || typeof backendError !== 'string') {
+                return 'Upload failed. Please try again.';
+            }
+
+            const error = backendError.toLowerCase();
+
+            if (error.includes('extraction failed') || error.includes('couldn\'t read')) {
+                return 'We couldn\'t read the receipt. The document may be blurry, unclear, or contain unreadable content. Please upload a clearer image or PDF.';
+            }
+            if (error.includes('empty') && !error.includes('extraction')) {
+                return 'The uploaded file is empty. Please select a valid receipt.';
+            }
+            if (error.includes('too large') || error.includes('exceeds')) {
+                const match = backendError.match(/(\d+(?:\.\d+)?)\s*(?:MB|mb)/);
+                if (match) {
+                    return `File is too large (${match[1]} MB). Maximum allowed size is 20 MB.`;
+                }
+                return 'File is too large. Maximum allowed size is 20 MB.';
+            }
+            if (error.includes('unsupported') && error.includes('extension')) {
+                return 'Unsupported file type. Please upload a PDF, JPG, JPEG, or PNG file.';
+            }
+            if (error.includes('unsupported')) {
+                return 'Unsupported file type. Please upload a PDF, JPG, JPEG, or PNG file.';
+            }
+            if (error.includes('not appear to be a valid pdf')) {
+                return 'The file does not appear to be a valid PDF. Please check the file and try again.';
+            }
+            if (error.includes('zero pages') || error.includes('empty pdf')) {
+                return 'The PDF file is empty. Please upload a PDF with content.';
+            }
+            if (error.includes('corrupted') || error.includes('malformed')) {
+                return 'The file appears to be corrupted. Please select a different file.';
+            }
+            if (error.includes('blank') || error.includes('mostly white')) {
+                return 'The image appears to be blank or mostly white. Please upload an image with visible receipt content.';
+            }
+            if (error.includes('too small') || error.includes('invalid dimensions')) {
+                return 'The image is too small. Please upload a higher resolution image.';
+            }
+            if (error.includes('not appear to be a valid')) {
+                return 'The file does not appear to be a valid receipt image. Please check the file and try again.';
+            }
+
+            return `Upload failed: ${escapeHtml(backendError)}`;
+        }
+
+        async function uploadReceipts() {
+            if (selectedFiles.length === 0) {
+                appendMessage('assistant', 'Please select at least one receipt file.');
                 return;
             }
 
-            const fileTypeMap = {
-                'application/pdf': 'PDF',
-                'image/jpeg': 'JPG',
-                'image/png': 'PNG'
-            };
-            const fileType = fileTypeMap[file.type] || 'File';
-            const fileSize = (file.size / 1024 / 1024).toFixed(2);
+            const filesToProcess = selectedFiles.filter(file => {
+                const maxSizeBytes = MAX_FILE_SIZE_MB * 1024 * 1024;
+                if (file.size > maxSizeBytes) {
+                    appendMessage('assistant', `⚠️ ${escapeHtml(file.name)} is too large (${(file.size / 1024 / 1024).toFixed(2)} MB). Maximum allowed is ${MAX_FILE_SIZE_MB} MB.`);
+                    return false;
+                }
+                return true;
+            });
 
-            const attachmentHtml = `<div class="attachment-card"><div class="attachment-info"><div class="attachment-name">📄 ${escapeHtml(file.name)}</div><div class="attachment-meta">${fileType} • ${fileSize} MB</div></div></div>`;
-            appendMessage('user', attachmentHtml);
-            appendMessage('assistant', '<div class="loading"><span>Processing your receipt...</span><div class="spinner"></div></div>');
+            if (filesToProcess.length === 0) {
+                return;
+            }
 
+            filesToProcess.forEach(file => {
+                const fileTypeMap = {
+                    'application/pdf': 'PDF',
+                    'image/jpeg': 'JPG',
+                    'image/png': 'PNG'
+                };
+                const fileType = fileTypeMap[file.type] || 'File';
+                const fileSize = (file.size / 1024 / 1024).toFixed(2);
+
+                const attachmentHtml = `<div class="attachment-card"><div class="attachment-info"><div class="attachment-name">📄 ${escapeHtml(file.name)}</div><div class="attachment-meta">${fileType} • ${fileSize} MB</div></div></div>`;
+                appendMessage('user', attachmentHtml);
+            });
+
+            appendMessage('assistant', `<div class="loading"><span>Processing ${filesToProcess.length} receipt${filesToProcess.length !== 1 ? 's' : ''}...</span><div class="spinner"></div></div>`);
+
+            for (const file of filesToProcess) {
+                await uploadSingleReceipt(file);
+            }
+
+            selectedFiles = [];
+            updateSelectedFilesList();
+            document.getElementById('receiptFiles').value = '';
+        }
+
+        async function uploadSingleReceipt(file) {
             try {
                 const formData = new FormData();
                 formData.append('file', file);
@@ -459,69 +635,89 @@
                 if (response.ok) {
                     const data = await response.json();
                     const receiptId = data.receipt_id;
-                    removeLastMessage();
 
                     if (data.status === 'EXACT_DUPLICATE') {
-                        appendMessage('assistant', `⚠️ ${escapeHtml(data.message)}`);
+                        removeLastMessage();
+                        appendMessage('assistant', `⚠️ ${escapeHtml(file.name)}: ${escapeHtml(data.message)}`);
                     } else {
-                        pollReceiptStatus(receiptId);
+                        await pollReceiptStatus(receiptId, file.name);
                     }
                 } else {
                     removeLastMessage();
-                    appendMessage('assistant', 'Upload failed. Please try again.');
+                    let errorMessage = 'Upload failed. Please try again.';
+                    try {
+                        const errorData = await response.json();
+                        if (errorData.errors && errorData.errors.file && Array.isArray(errorData.errors.file)) {
+                            const fileErrors = errorData.errors.file;
+                            if (fileErrors.length > 0) {
+                                const backendError = fileErrors[0];
+                                errorMessage = _formatErrorMessage(backendError);
+                            }
+                        } else if (errorData.error) {
+                            errorMessage = _formatErrorMessage(errorData.error);
+                        }
+                    } catch (parseError) {
+                        // Response wasn't JSON or parsing failed; use fallback
+                    }
+                    appendMessage('assistant', `❌ ${escapeHtml(file.name)}: ${errorMessage}`);
                 }
             } catch (error) {
                 removeLastMessage();
-                appendMessage('assistant', `Error: ${escapeHtml(error.message)}`);
+                appendMessage('assistant', `❌ ${escapeHtml(file.name)}: Error - ${escapeHtml(error.message)}`);
             }
         }
 
-        async function pollReceiptStatus(receiptId) {
+        async function pollReceiptStatus(receiptId, fileName) {
             const maxAttempts = 30;
             let attempts = 0;
 
-            const poll = async () => {
-                try {
-                    const response = await fetch(`/api/v1/receipts/${receiptId}/?owner=${OWNER}`, {
-                        headers: { 'X-Requested-With': 'XMLHttpRequest' }
-                    });
+            return new Promise((resolve) => {
+                const poll = async () => {
+                    try {
+                        const response = await fetch(`/api/v1/receipts/${receiptId}/?owner=${OWNER}`, {
+                            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                        });
 
-                    if (response.ok) {
-                        const receipt = await response.json();
+                        if (response.ok) {
+                            const receipt = await response.json();
 
-                        if (['APPROVED', 'REJECTED', 'EXACT_DUPLICATE', 'SEMANTIC_DUPLICATE', 'FAILED'].includes(receipt.status)) {
-                            removeLastMessage();
-                            await handleReceiptResult(receipt);
-                        } else {
-                            attempts++;
-                            if (attempts < maxAttempts) {
-                                setTimeout(poll, 1000);
-                            } else {
+                            if (['APPROVED', 'REJECTED', 'EXACT_DUPLICATE', 'SEMANTIC_DUPLICATE', 'FAILED'].includes(receipt.status)) {
                                 removeLastMessage();
-                                appendMessage('assistant', 'Processing timed out. Please refresh and try again.');
+                                await handleReceiptResult(receipt, fileName);
+                                resolve();
+                            } else {
+                                attempts++;
+                                if (attempts < maxAttempts) {
+                                    setTimeout(poll, 1000);
+                                } else {
+                                    removeLastMessage();
+                                    appendMessage('assistant', `Processing of ${escapeHtml(fileName)} timed out. Please refresh and try again.`);
+                                    resolve();
+                                }
                             }
                         }
+                    } catch (error) {
+                        console.error('Poll error:', error);
+                        resolve();
                     }
-                } catch (error) {
-                    console.error('Poll error:', error);
-                }
-            };
+                };
 
-            poll();
+                poll();
+            });
         }
 
-        async function handleReceiptResult(receipt) {
+        async function handleReceiptResult(receipt, fileName) {
             const category_confidence = receipt.category_confidence || 0;
 
             if (category_confidence < CATEGORY_CONFIDENCE_THRESHOLD && receipt.status !== 'EXACT_DUPLICATE' && receipt.status !== 'SEMANTIC_DUPLICATE' && receipt.status !== 'FAILED') {
-                appendMessage('assistant', "I couldn't confidently determine the expense category. Please select one:");
-                await loadCategorySelector(receipt.id);
+                appendMessage('assistant', `I couldn't confidently determine the expense category for ${escapeHtml(fileName)}. Please select one:`);
+                await loadCategorySelector(receipt.id, fileName);
             } else {
-                displayReceiptResult(receipt);
+                displayReceiptResult(receipt, fileName);
             }
         }
 
-        async function loadCategorySelector(receiptId) {
+        async function loadCategorySelector(receiptId, fileName) {
             try {
                 const response = await fetch('/api/v1/receipts/categories/', {
                     headers: { 'X-Requested-With': 'XMLHttpRequest' }
@@ -535,7 +731,7 @@
                         html += `<option value="${escapeHtml(cat)}">${escapeHtml(cat)}</option>`;
                     });
 
-                    html += '</select><button onclick="confirmCategory(\'' + receiptId + '\')">Confirm Category</button></div>';
+                    html += `</select><button onclick="confirmCategory('${receiptId}', '${escapeHtml(fileName)}')">Confirm Category</button></div>`;
                     const lastMsg = document.querySelector('.chat-messages .message:last-child .message-bubble');
                     if (lastMsg) lastMsg.innerHTML += html;
                 }
@@ -544,7 +740,7 @@
             }
         }
 
-        async function confirmCategory(receiptId) {
+        async function confirmCategory(receiptId, fileName) {
             const select = document.getElementById('categorySelect');
             const category = select.value;
 
@@ -566,7 +762,7 @@
                 if (response.ok) {
                     const receipt = await response.json();
                     document.querySelector('.category-selector').remove();
-                    displayReceiptResult(receipt);
+                    displayReceiptResult(receipt, fileName);
                 } else {
                     appendMessage('assistant', 'Failed to save category. Please try again.');
                 }
@@ -575,7 +771,7 @@
             }
         }
 
-        function displayReceiptResult(receipt) {
+        function displayReceiptResult(receipt, fileName) {
             let statusClass = 'approved';
             let statusText = '✅ APPROVED';
 
@@ -597,9 +793,9 @@
             }
 
             let html = `<div class="result-card ${statusClass}">`;
+            html += `<div class="result-row"><div class="result-label">Filename</div><div class="result-value"><strong>${escapeHtml(fileName || receipt.original_filename)}</strong></div></div>`;
             html += `<div class="result-row"><div class="result-label">Status</div><div class="result-value"><span class="status-badge ${statusClass}">${statusText}</span></div></div>`;
 
-            if (receipt.original_filename) html += `<div class="result-row"><div class="result-label">Filename</div><div class="result-value">${escapeHtml(receipt.original_filename)}</div></div>`;
             if (receipt.vendor_name) html += `<div class="result-row"><div class="result-label">Vendor</div><div class="result-value">${escapeHtml(receipt.vendor_name)}</div></div>`;
             if (receipt.transaction_date) html += `<div class="result-row"><div class="result-label">Date</div><div class="result-value">${formatDate(receipt.transaction_date)}</div></div>`;
             if (receipt.total_amount) html += `<div class="result-row"><div class="result-label">Amount</div><div class="result-value">${receipt.currency || 'N/A'} ${receipt.total_amount}</div></div>`;
@@ -621,7 +817,7 @@
                 html += `<div class="result-row"><div class="result-label">Duplicate Info</div><div class="result-value">${escapeHtml(receipt.duplicate_reason)}</div></div>`;
             }
 
-            if (receipt.processing_message) {
+            if (receipt.processing_message && receipt.status === 'FAILED') {
                 html += `<div class="result-row"><div class="result-label">Message</div><div class="result-value">${escapeHtml(receipt.processing_message)}</div></div>`;
             }
 
@@ -631,7 +827,12 @@
             html += '</div>';
 
             appendMessage('assistant', html);
-            clearFileInput();
+        }
+
+        function clearFileInput() {
+            document.getElementById('receiptFiles').value = '';
+            selectedFiles = [];
+            updateSelectedFilesList();
         }
 
         function appendMessage(role, content) {
@@ -648,14 +849,9 @@
             if (messages.length > 0) messages[messages.length - 1].remove();
         }
 
-        function clearFileInput() {
-            document.getElementById('receiptFile').value = '';
-            document.getElementById('selectedFile').style.display = 'none';
-        }
-
         function clearChat() {
             document.getElementById('chatMessages').innerHTML = '';
-            appendMessage('assistant', 'Chat cleared. Ready for a new receipt!');
+            appendMessage('assistant', '👋 Chat cleared. Ready for new receipts!');
             clearFileInput();
         }
 
