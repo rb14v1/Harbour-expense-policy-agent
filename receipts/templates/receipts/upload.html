@@ -479,7 +479,8 @@
     <script>
         const OWNER = 'default-user';
         const CATEGORY_CONFIDENCE_THRESHOLD = 0.80;
-        const MAX_FILE_SIZE_MB = 5;
+        const MAX_FILE_SIZE_MB = 50;
+        const COMPRESSION_THRESHOLD_MB = 5;
         let selectedFiles = [];
 
         document.getElementById('receiptFiles').addEventListener('change', function(e) {
@@ -545,9 +546,9 @@
             if (error.includes('too large') || error.includes('exceeds')) {
                 const match = backendError.match(/(\d+(?:\.\d+)?)\s*(?:MB|mb)/);
                 if (match) {
-                    return `File is too large (${match[1]} MB). Maximum allowed size is 20 MB.`;
+                    return `File is too large (${match[1]} MB). Maximum allowed size is ${MAX_FILE_SIZE_MB} MB.`;
                 }
-                return 'File is too large. Maximum allowed size is 20 MB.';
+                return `File is too large. Maximum allowed size is ${MAX_FILE_SIZE_MB} MB.`;
             }
             if (error.includes('unsupported') && error.includes('extension')) {
                 return 'Unsupported file type. Please upload a PDF, JPG, JPEG, or PNG file.';
@@ -695,10 +696,26 @@
                                     resolve();
                                 }
                             }
+                        } else {
+                            attempts++;
+                            if (attempts < maxAttempts) {
+                                setTimeout(poll, 1000);
+                            } else {
+                                removeProcessingMessage(processingMsgId);
+                                appendMessage('assistant', `❌ ${escapeHtml(fileName)}: Unable to retrieve processing status. Please refresh and try again.`);
+                                resolve();
+                            }
                         }
                     } catch (error) {
                         console.error('Poll error:', error);
-                        resolve();
+                        attempts++;
+                        if (attempts < maxAttempts) {
+                            setTimeout(poll, 1000);
+                        } else {
+                            removeProcessingMessage(processingMsgId);
+                            appendMessage('assistant', `❌ ${escapeHtml(fileName)}: Connection error while processing. Please refresh and try again.`);
+                            resolve();
+                        }
                     }
                 };
 
@@ -735,8 +752,11 @@
                     html += `</select><button onclick="confirmCategory('${receiptId}', '${escapeHtml(fileName)}')">Confirm Category</button></div>`;
                     const lastMsg = document.querySelector('.chat-messages .message:last-child .message-bubble');
                     if (lastMsg) lastMsg.innerHTML += html;
+                } else {
+                    appendMessage('assistant', 'Could not load categories. Please refresh the page.');
                 }
             } catch (error) {
+                console.error('Category load error:', error);
                 appendMessage('assistant', 'Could not load categories. Please refresh the page.');
             }
         }
@@ -762,13 +782,24 @@
 
                 if (response.ok) {
                     const receipt = await response.json();
-                    document.querySelector('.category-selector').remove();
+                    const selector = document.querySelector('.category-selector');
+                    if (selector) selector.remove();
                     displayReceiptResult(receipt, fileName);
                 } else {
-                    appendMessage('assistant', 'Failed to save category. Please try again.');
+                    let errorMsg = 'Failed to save category. Please try again.';
+                    try {
+                        const errorData = await response.json();
+                        if (errorData.error) {
+                            errorMsg = errorData.error;
+                        }
+                    } catch (e) {
+                        // Could not parse error response
+                    }
+                    appendMessage('assistant', errorMsg);
                 }
             } catch (error) {
-                appendMessage('assistant', `Error: ${escapeHtml(error.message)}`);
+                console.error('Category confirmation error:', error);
+                appendMessage('assistant', `Error saving category: ${escapeHtml(error.message)}`);
             }
         }
 

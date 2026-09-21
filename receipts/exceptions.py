@@ -32,3 +32,7 @@ class HashingError(ReceiptAppException):
 
 class PolicyValidationError(ReceiptAppException):
     pass
+
+
+class CompressionError(ReceiptAppException):
+    pass

@@ -86,10 +86,16 @@ REST_FRAMEWORK = {
 
 CORS_ALLOWED_ORIGINS = os.getenv('CORS_ALLOWED_ORIGINS', 'http://localhost:3000').split(',')
 
-MAX_RECEIPT_UPLOAD_MB = int(os.getenv('MAX_RECEIPT_UPLOAD_MB', '5'))
+MAX_RECEIPT_UPLOAD_MB = int(os.getenv('MAX_RECEIPT_UPLOAD_MB', '50'))
+MAX_RECEIPT_COMPRESSION_THRESHOLD_MB = int(os.getenv('MAX_RECEIPT_COMPRESSION_THRESHOLD_MB', '5'))
 RECEIPT_MAX_AGE_DAYS = int(os.getenv('RECEIPT_MAX_AGE_DAYS', '35'))
 DUPLICATE_SCORE_THRESHOLD = int(os.getenv('DUPLICATE_SCORE_THRESHOLD', '90'))
 REVIEW_SCORE_THRESHOLD = int(os.getenv('REVIEW_SCORE_THRESHOLD', '75'))
+
+# File compression configuration
+IMAGE_COMPRESSION_QUALITY = int(os.getenv('IMAGE_COMPRESSION_QUALITY', '75'))
+IMAGE_MAX_PIXELS = int(os.getenv('IMAGE_MAX_PIXELS', '8000000'))
+PDF_COMPRESSION_ENABLED = os.getenv('PDF_COMPRESSION_ENABLED', 'True').lower() == 'true'
 
 # Django upload limits - allow files larger than application limit so we can return proper error
 # Default Django values are ~2.5MB each, which reject large files before our validation

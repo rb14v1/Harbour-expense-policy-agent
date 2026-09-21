@@ -1,5 +1,6 @@
 import uuid
 import json
+import io
 from django.utils import timezone
 from receipts.models import Receipt
 from receipts.services.file_validation_service import FileValidationService
@@ -9,7 +10,8 @@ from receipts.services.document_intelligence_service import DocumentIntelligence
 from receipts.services.normalization_service import NormalizationService
 from receipts.services.duplicate_service import DuplicateService
 from receipts.services.policy_service import PolicyService
-from receipts.exceptions import BlobUploadError, DocumentExtractionError
+from receipts.services.file_processing_service import FileProcessingService
+from receipts.exceptions import BlobUploadError, DocumentExtractionError, CompressionError
 
 
 class ReceiptService:
@@ -74,9 +76,11 @@ class ReceiptService:
 
             file_bytes = self.blob_service.download(receipt.blob_name)
 
+            processing_bytes = self._get_processing_copy(file_bytes, receipt.mime_type, receipt.original_filename)
+
             try:
                 extracted = self.doc_intel_service.analyze_receipt(
-                    content=file_bytes,
+                    content=processing_bytes,
                     content_type=receipt.mime_type,
                 )
             except DocumentExtractionError as e:
@@ -400,6 +404,23 @@ class ReceiptService:
             return True
 
         return False
+
+    def _get_processing_copy(self, file_bytes: bytes, mime_type: str, original_filename: str) -> bytes:
+        """
+        Returns optimized bytes for OCR processing.
+        Applies compression if file size exceeds threshold.
+        Original bytes remain in Blob Storage.
+        """
+        file_obj = io.BytesIO(file_bytes)
+        file_obj.size = len(file_bytes)
+
+        try:
+            return FileProcessingService.get_processing_copy(file_obj, mime_type, original_filename)
+        except CompressionError as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"File compression failed: {str(e)}. Falling back to original bytes.")
+            return file_bytes
 
     @staticmethod
     def _generate_blob_name(owner: str, receipt_id, filename: str) -> str:

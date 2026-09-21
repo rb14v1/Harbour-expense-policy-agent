@@ -6,9 +6,9 @@
   "packageName": "com.expensepolicy.agent",
   "developer": {
     "name": "Finance Operations",
-    "websiteUrl": "https://unmentionable-zechariah-uncritically.ngrok-free.dev",
-    "privacyUrl": "https://unmentionable-zechariah-uncritically.ngrok-free.dev/privacy",
-    "termsOfUseUrl": "https://unmentionable-zechariah-uncritically.ngrok-free.dev/terms"
+    "websiteUrl": "https://tutu-deafening-overjoyed.ngrok-free.dev",
+"privacyUrl": "https://tutu-deafening-overjoyed.ngrok-free.dev/privacy",
+"termsOfUseUrl": "https://tutu-deafening-overjoyed.ngrok-free.dev/terms"
   },
   "name": {
     "short": "Expense Policy Agent",
@@ -27,8 +27,8 @@
     {
       "entityId": "finance-review",
       "name": "Finance Review",
-      "contentUrl": "https://unmentionable-zechariah-uncritically.ngrok-free.dev/finance/tab",
-      "websiteUrl": "https://unmentionable-zechariah-uncritically.ngrok-free.dev/finance/tab",
+      "contentUrl": "https://tutu-deafening-overjoyed.ngrok-free.dev/finance/tab",
+      "websiteUrl": "https://tutu-deafening-overjoyed.ngrok-free.dev/finance/tab",
       "scopes": [
         "personal"
       ]
@@ -38,9 +38,9 @@
     "identity"
   ],
   "validDomains": [
-    "unmentionable-zechariah-uncritically.ngrok-free.dev",
-    "teams.microsoft.com"
-  ],
+  "tutu-deafening-overjoyed.ngrok-free.dev",
+  "teams.microsoft.com"
+],
   "webApplicationInfo": {
     "id": "08923630-1eab-4fed-a15c-9bb6f7bec5cf",
     "resource": "api://unmentionable-zechariah-uncritically.ngrok-free.dev/08923630-1eab-4fed-a15c-9bb6f7bec5cf"

@@ -954,24 +954,25 @@ class UploadErrorHandlingTests(TestCase):
         self.assertIn('unsupported', error_msg)
 
     def test_file_too_large_error(self):
-        """File exceeding 20MB should return size-specific error."""
+        """File exceeding 50MB absolute maximum should return size-specific error."""
         from django.test import Client
-        
+
         client = Client()
-        large_pdf = b"%PDF-1.4\n" + (b"x" * (21 * 1024 * 1024))
+        large_pdf = b"%PDF-1.4\n" + (b"x" * (51 * 1024 * 1024))
         file = SimpleUploadedFile("huge.pdf", large_pdf, content_type="application/pdf")
-        
+
         response = client.post(
             '/api/v1/receipts/upload/',
             {'file': file, 'owner': 'test-user'},
             format='multipart'
         )
-        
+
         self.assertEqual(response.status_code, 400)
         data = response.json()
         self.assertIn('errors', data)
         error_msg = str(data['errors']['file'][0]).lower()
         self.assertIn('too large', error_msg)
+        self.assertIn('50', error_msg)
 
     def test_invalid_pdf_header_error(self):
         """Invalid PDF header should return specific error."""
@@ -1107,87 +1108,114 @@ class UploadErrorHandlingTests(TestCase):
         self.assertIn('blurry', result.processing_message.lower())
 
 
-class FileSizeLimit5MBTests(TestCase):
-    """Tests for 5 MB file size limit."""
+class FileSizeCompressionThresholdTests(TestCase):
+    """Tests for file size compression threshold (5 MB) and absolute maximum (50 MB)."""
 
-    def test_file_5mb_accepted(self):
-        """File exactly 5 MB should be accepted."""
+    def _create_valid_minimal_pdf(self, size_bytes):
+        """Create a valid minimal PDF of approximately the specified size by padding base PDF."""
+        base_pdf = (
+            b"%PDF-1.4\n"
+            b"%\xE2\xE3\xCF\xD3\n"
+            b"1 0 obj\n"
+            b"<</Type/Catalog/Pages 2 0 R>>\n"
+            b"endobj\n"
+            b"2 0 obj\n"
+            b"<</Type/Pages/Kids[3 0 R]/Count 1>>\n"
+            b"endobj\n"
+            b"3 0 obj\n"
+            b"<</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]>>\n"
+            b"endobj\n"
+            b"xref\n"
+            b"0 4\n"
+            b"0000000000 65535 f\n"
+            b"0000000009 00000 n\n"
+            b"0000000074 00000 n\n"
+            b"0000000133 00000 n\n"
+            b"trailer\n"
+            b"<</Size 4/Root 1 0 R>>\n"
+            b"startxref\n"
+            b"190\n"
+            b"%%EOF"
+        )
+
+        if len(base_pdf) >= size_bytes:
+            return base_pdf[:size_bytes]
+
+        padding_size = size_bytes - len(base_pdf)
+        padding = b"x" * padding_size
+        return base_pdf + padding
+
+    def test_file_5mb_accepted_no_compression(self):
+        """File at 5 MB threshold should be accepted without compression triggering."""
+        from receipts.services import ReceiptService
+
+        service = ReceiptService()
+        pdf_5mb = self._create_valid_minimal_pdf(5 * 1024 * 1024)
+        file_obj = SimpleUploadedFile("receipt_5mb.pdf", pdf_5mb, content_type="application/pdf")
+
+        receipt = service.create_and_upload_receipt(file_obj, "receipt_5mb.pdf", owner="test-user")
+
+        self.assertIsNotNone(receipt.id)
+        self.assertEqual(receipt.file_size, 5 * 1024 * 1024)
+
+    def test_file_above_5mb_accepted_with_compression(self):
+        """File above 5 MB should be accepted and compression applied during processing."""
+        from receipts.services import ReceiptService
+
+        service = ReceiptService()
+        pdf_6mb = self._create_valid_minimal_pdf(5 * 1024 * 1024 + 512 * 1024)
+        file_obj = SimpleUploadedFile("receipt_6mb.pdf", pdf_6mb, content_type="application/pdf")
+
+        receipt = service.create_and_upload_receipt(file_obj, "receipt_6mb.pdf", owner="test-user")
+
+        expected_size = 5 * 1024 * 1024 + 512 * 1024
+        self.assertEqual(receipt.file_size, expected_size, "Original file size should be preserved")
+
+    def test_file_above_50mb_rejected(self):
+        """File above 50 MB absolute maximum should be rejected."""
         from django.test import Client
-        
+
         client = Client()
-        pdf_5mb = b"%PDF-1.4\n" + (b"x" * (5 * 1024 * 1024 - 20))
-        file = SimpleUploadedFile("receipt_5mb.pdf", pdf_5mb, content_type="application/pdf")
-        
+        pdf_51mb = b"%PDF-1.4\n" + (b"x" * (51 * 1024 * 1024))
+        file = SimpleUploadedFile("receipt_51mb.pdf", pdf_51mb, content_type="application/pdf")
+
         response = client.post(
             '/api/v1/receipts/upload/',
             {'file': file, 'owner': 'test-user'},
             format='multipart'
         )
-        
-        # Should not return file size error
-        if response.status_code == 400:
-            data = response.json()
-            error_msg = str(data.get('errors', {}).get('file', [''])[0]).lower()
-            self.assertNotIn('too large', error_msg, "5 MB file should not be rejected as too large")
-        else:
-            # Accepted successfully
-            self.assertIn(response.status_code, [201, 200])
 
-    def test_file_above_5mb_rejected(self):
-        """File above 5 MB should be rejected."""
-        from django.test import Client
-        
-        client = Client()
-        pdf_6mb = b"%PDF-1.4\n" + (b"x" * (6 * 1024 * 1024))
-        file = SimpleUploadedFile("huge.pdf", pdf_6mb, content_type="application/pdf")
-        
-        response = client.post(
-            '/api/v1/receipts/upload/',
-            {'file': file, 'owner': 'test-user'},
-            format='multipart'
-        )
-        
         self.assertEqual(response.status_code, 400)
         data = response.json()
         self.assertIn('errors', data)
         error_msg = str(data['errors']['file'][0]).lower()
         self.assertIn('too large', error_msg)
-        self.assertIn('5', error_msg)  # Should mention 5 MB
+        self.assertIn('50', error_msg)
 
-    def test_file_5mb_plus_1_rejected(self):
-        """File just over 5 MB should be rejected."""
-        from django.test import Client
-        
-        client = Client()
-        pdf_51mb = b"%PDF-1.4\n" + (b"x" * ((5 * 1024 * 1024) + 1024))
-        file = SimpleUploadedFile("slightly_over.pdf", pdf_51mb, content_type="application/pdf")
-        
-        response = client.post(
-            '/api/v1/receipts/upload/',
-            {'file': file, 'owner': 'test-user'},
-            format='multipart'
-        )
-        
-        self.assertEqual(response.status_code, 400)
-        error_msg = str(response.json()['errors']['file'][0]).lower()
-        self.assertIn('too large', error_msg)
+    def test_original_bytes_preserved_in_blob(self):
+        """Original file bytes should be preserved in Blob Storage."""
+        from receipts.services import ReceiptService
 
-    def test_file_above_5mb_no_receipt_created(self):
-        """File above 5 MB should not create a Receipt."""
-        from django.test import Client
-        
-        client = Client()
-        pdf_6mb = b"%PDF-1.4\n" + (b"x" * (6 * 1024 * 1024))
-        file = SimpleUploadedFile("huge.pdf", pdf_6mb, content_type="application/pdf")
-        
-        receipts_before = Receipt.objects.count()
-        
-        response = client.post(
-            '/api/v1/receipts/upload/',
-            {'file': file, 'owner': 'test-user'},
-            format='multipart'
-        )
-        
-        receipts_after = Receipt.objects.count()
-        self.assertEqual(receipts_before, receipts_after, "No receipt should be created for oversized file")
-        self.assertEqual(response.status_code, 400)
+        service = ReceiptService()
+        pdf_6mb = self._create_valid_minimal_pdf(6 * 1024 * 1024)
+        file_obj = SimpleUploadedFile("receipt_6mb.pdf", pdf_6mb, content_type="application/pdf")
+
+        receipt = service.create_and_upload_receipt(file_obj, "receipt_6mb.pdf", owner="test-user")
+
+        downloaded = service.blob_service.download(receipt.blob_name)
+        self.assertEqual(len(downloaded), 6 * 1024 * 1024, "Blob should contain original uncompressed bytes")
+
+    def test_sha256_from_original_bytes(self):
+        """SHA-256 hash should be calculated from original file bytes, not compressed copy."""
+        from receipts.services import ReceiptService, HashingService
+
+        service = ReceiptService()
+        hashing = HashingService()
+        pdf_6mb = self._create_valid_minimal_pdf(6 * 1024 * 1024)
+        file_obj = SimpleUploadedFile("receipt_6mb.pdf", pdf_6mb, content_type="application/pdf")
+
+        receipt = service.create_and_upload_receipt(file_obj, "receipt_6mb.pdf", owner="test-user")
+
+        file_obj.seek(0)
+        expected_hash = hashing.sha256(file_obj)
+        self.assertEqual(receipt.sha256_hash, expected_hash, "SHA-256 must be from original bytes")

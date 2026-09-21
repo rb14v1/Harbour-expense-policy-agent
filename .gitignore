@@ -7,3 +7,4 @@ __pycache__/
 # Local development
 venv/
 *.sqlite3
+venv_old/
