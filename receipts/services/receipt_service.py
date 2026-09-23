@@ -189,8 +189,8 @@ class ReceiptService:
             receipt.policy_status = policy_result['status']
 
             if policy_result['status'] == 'APPROVED':
-                receipt.status = 'APPROVED'
-                receipt.processing_message = "Receipt has been validated and approved."
+                receipt.status = 'NEEDS_REVIEW'
+                receipt.processing_message = "Receipt has been validated and approved by policy. Awaiting Finance review."
             else:
                 receipt.status = 'REJECTED'
                 rejection_reasons = []

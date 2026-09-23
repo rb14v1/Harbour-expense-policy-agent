@@ -74,7 +74,7 @@ def get_receipt_list_card(receipts: List[Dict[str, Any]], page: int = 1) -> Dict
 
 
 def get_receipt_detail_card(receipt: Dict[str, Any]) -> Dict[str, Any]:
-    """Generate detailed card for single receipt."""
+    """Generate detailed card for single receipt with Finance review support."""
     status = receipt.get("status", "UNKNOWN")
     status_color = _get_status_color(status)
 
@@ -95,6 +95,16 @@ def get_receipt_detail_card(receipt: Dict[str, Any]) -> Dict[str, Any]:
         }
     ]
 
+    # Optional: Employee information
+    if receipt.get("employee_name"):
+        body.append({
+            "type": "TextBlock",
+            "text": f"**Employee:** {receipt['employee_name']}",
+            "wrap": True,
+            "spacing": "medium",
+            "size": "small",
+        })
+
     # Receipt details
     details = []
     if receipt.get("vendor_name"):
@@ -113,6 +123,25 @@ def get_receipt_detail_card(receipt: Dict[str, Any]) -> Dict[str, Any]:
             "wrap": True,
             "spacing": "medium",
         })
+
+    # Optional: Category confidence and reason
+    if receipt.get("category_confidence") is not None or receipt.get("category_reason"):
+        category_info = []
+        if receipt.get("category_confidence") is not None:
+            confidence_pct = int(receipt.get("category_confidence", 0) * 100)
+            category_info.append(f"**Confidence:** {confidence_pct}%")
+        if receipt.get("category_reason"):
+            category_info.append(f"**Reason:** {receipt['category_reason']}")
+
+        if category_info:
+            body.append({
+                "type": "TextBlock",
+                "text": "\n".join(category_info),
+                "wrap": True,
+                "spacing": "medium",
+                "size": "small",
+                "isSubtle": True,
+            })
 
     # Duplicate information
     if status in ["EXACT_DUPLICATE", "SEMANTIC_DUPLICATE"]:
@@ -138,6 +167,44 @@ def get_receipt_detail_card(receipt: Dict[str, Any]) -> Dict[str, Any]:
             "text": f"**Policy Status:** {receipt['policy_status']}",
             "wrap": True,
             "spacing": "medium",
+        })
+
+    # Optional: Processing message or notes
+    if receipt.get("processing_message"):
+        body.append({
+            "type": "TextBlock",
+            "text": f"**Notes:** {receipt['processing_message']}",
+            "wrap": True,
+            "spacing": "medium",
+            "size": "small",
+            "isSubtle": True,
+        })
+
+    # Optional: Created timestamp
+    if receipt.get("created_at"):
+        body.append({
+            "type": "TextBlock",
+            "text": f"**Created:** {receipt['created_at']}",
+            "wrap": True,
+            "spacing": "medium",
+            "size": "small",
+            "isSubtle": True,
+        })
+
+    # Optional: Rejection reason input (only when approval is pending)
+    if status not in ["APPROVED", "REJECTED", "EXACT_DUPLICATE", "SEMANTIC_DUPLICATE"]:
+        body.append({
+            "type": "TextBlock",
+            "text": "Rejection Reason (optional, if rejecting):",
+            "weight": "bolder",
+            "size": "small",
+            "spacing": "medium",
+        })
+        body.append({
+            "type": "Input.Text",
+            "id": "rejection_reason",
+            "placeholder": "Enter reason for rejection (optional)",
+            "multiline": True,
         })
 
     # Action buttons
@@ -182,38 +249,69 @@ def get_receipt_detail_card(receipt: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def get_decision_confirmation_card(receipt_id: str, decision: str) -> Dict[str, Any]:
-    """Generate confirmation card after decision."""
+def get_decision_confirmation_card(receipt_id: str, decision: str, notes: Optional[str] = None) -> Dict[str, Any]:
+    """Generate confirmation card after Finance decision (approve/reject).
+
+    Args:
+        receipt_id: Receipt UUID
+        decision: "APPROVED" or "REJECTED"
+        notes: Optional rejection reason or approval notes
+    """
     icon = "✅" if decision == "APPROVED" else "❌"
     color = "good" if decision == "APPROVED" else "attention"
+
+    body = [
+        {
+            "type": "TextBlock",
+            "text": f"{icon} Receipt {decision}",
+            "weight": "bolder",
+            "size": "large",
+            "color": color,
+        },
+        {
+            "type": "TextBlock",
+            "text": f"Receipt ID: {receipt_id}",
+            "wrap": True,
+            "size": "small",
+            "isSubtle": True,
+        },
+    ]
+
+    # Add approval confirmation
+    if decision == "APPROVED":
+        body.append({
+            "type": "TextBlock",
+            "text": "✓ Reviewed by Finance",
+            "wrap": True,
+            "spacing": "medium",
+            "size": "small",
+            "color": "good",
+        })
+
+    # Add rejection reason if provided
+    if decision == "REJECTED" and notes:
+        body.append({
+            "type": "TextBlock",
+            "text": f"**Reason:** {notes}",
+            "wrap": True,
+            "spacing": "medium",
+            "size": "small",
+        })
+
+    body.append({
+        "type": "TextBlock",
+        "text": f"Timestamp: {datetime.utcnow().isoformat()}Z",
+        "wrap": True,
+        "spacing": "medium",
+        "size": "small",
+        "isSubtle": True,
+    })
 
     return {
         "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
         "type": "AdaptiveCard",
         "version": "1.4",
-        "body": [
-            {
-                "type": "TextBlock",
-                "text": f"{icon} Receipt {decision}",
-                "weight": "bolder",
-                "size": "large",
-                "color": color,
-            },
-            {
-                "type": "TextBlock",
-                "text": f"Receipt ID: {receipt_id}",
-                "wrap": True,
-                "size": "small",
-                "isSubtle": True,
-            },
-            {
-                "type": "TextBlock",
-                "text": f"Timestamp: {datetime.utcnow().isoformat()}Z",
-                "wrap": True,
-                "size": "small",
-                "isSubtle": True,
-            }
-        ]
+        "body": body,
     }
 
 

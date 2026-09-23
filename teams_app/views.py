@@ -1,5 +1,6 @@
 import json
 import logging
+import httpx
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
@@ -119,8 +120,45 @@ def finance_tab_config(request):
         return Response(config, status=status.HTTP_200_OK)
 
     except Exception as e:
-        logger.error(f"Error getting Finance Tab config: {str(e)}")
+        logger.error(f"Error getting Finance tab config: {str(e)}")
         return Response(
             {"error": str(e)},
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['POST'])
+def teams_messages_proxy(request):
+    """
+    Proxy Teams bot messages to FastAPI Teams SDK service.
+
+    Flow: Teams → ngrok (8000) → Django proxy → FastAPI (8001)
+
+    This endpoint forwards Teams activities to the FastAPI Teams service
+    running on localhost:8001, which handles Teams protocol and SDK routing.
+    The original uploaded files, Finance tab, and Django APIs remain unchanged.
+    """
+    try:
+        with httpx.Client(timeout=30) as client:
+            response = client.post(
+                'http://localhost:8001/api/messages',
+                json=request.data,
+            )
+
+        return Response(
+            response.json() if response.text else {},
+            status=response.status_code,
+        )
+
+    except httpx.TimeoutException:
+        logger.error("Timeout proxying to Teams service on 8001")
+        return Response(
+            {"error": "Teams service timeout"},
+            status=status.HTTP_504_GATEWAY_TIMEOUT,
+        )
+    except Exception as e:
+        logger.error(f"Error proxying to Teams service: {e}")
+        return Response(
+            {"error": "Failed to process Teams message"},
+            status=status.HTTP_502_BAD_GATEWAY,
         )

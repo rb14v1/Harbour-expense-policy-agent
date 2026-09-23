@@ -105,20 +105,6 @@ async def get_config_info():
     }
 
 
-@app.post("/api/messages", tags=["Teams"])
-async def messages(request: Request):
-    """
-    Teams messaging endpoint.
-
-    Receives Teams activities and routes them to Teams SDK.
-    This endpoint is configured in Teams manifest.
-    """
-    # The FastAPIAdapter handles routing to the Teams SDK
-    # This endpoint is called by Teams for all activities
-    logger.debug(f"Received Teams activity on /api/messages")
-    return Response(status_code=202)  # Accepted
-
-
 # Finance API Proxy Endpoints
 # These endpoints proxy requests to Django Finance APIs
 # allowing the browser Finance tab to call relative URLs

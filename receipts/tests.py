@@ -12,6 +12,7 @@ from receipts.services import (
 from receipts.exceptions import UnsupportedFileTypeError, ReceiptTooLargeError
 from datetime import datetime, timedelta, date
 from decimal import Decimal
+from unittest.mock import patch, MagicMock
 import io
 
 
@@ -1219,3 +1220,138 @@ class FileSizeCompressionThresholdTests(TestCase):
         file_obj.seek(0)
         expected_hash = hashing.sha256(file_obj)
         self.assertEqual(receipt.sha256_hash, expected_hash, "SHA-256 must be from original bytes")
+
+
+class FinancePendingReceiptWorkflowTests(TestCase):
+    """Tests for Part 1: Finance-pending receipt workflow."""
+
+    @patch('receipts.services.receipt_service.BlobService')
+    @patch('receipts.services.receipt_service.DocumentIntelligenceService')
+    def test_policy_pass_sets_needs_review_status(self, mock_doc_intel_class, mock_blob_class):
+        """After policy passes, receipt should be NEEDS_REVIEW (not APPROVED)."""
+        # Mock blob service to return dummy PDF bytes
+        mock_blob = MagicMock()
+        mock_blob.download.return_value = b"%PDF-1.4\nDummy PDF content"
+        mock_blob_class.return_value = mock_blob
+
+        # Mock document intelligence to return valid extracted data in required structure
+        mock_doc_intel = MagicMock()
+        mock_doc_intel.analyze_receipt.return_value = {
+            'merchant': {'name': 'Test Vendor'},
+            'amounts': {'total': 100.00, 'currency': 'USD'},
+            'invoice': {'transaction_date': (date.today() - timedelta(days=10)).isoformat()},
+            'payment': {'method': 'Cash'},
+            'extraction': {'provider': 'azure_ai_document_intelligence'},
+        }
+        mock_doc_intel_class.return_value = mock_doc_intel
+
+        receipt = Receipt.objects.create(
+            owner="finance-user",
+            original_filename="receipt.pdf",
+            blob_name="receipts/finance-user/uuid/receipt.pdf",
+            mime_type="application/pdf",
+            file_size=1000,
+            sha256_hash="abc123",
+            transaction_date=date.today() - timedelta(days=10),
+            total_amount=Decimal("100.00"),
+            currency="USD",
+            vendor_name="Test Vendor",
+            normalized_json={"vendor_name": "Test Vendor"},
+        )
+
+        from receipts.services import ReceiptService
+        service = ReceiptService()
+        result = service.process_receipt(str(receipt.id))
+
+        self.assertEqual(result.status, 'NEEDS_REVIEW', "Policy-passing receipt should be NEEDS_REVIEW for Finance review")
+        self.assertEqual(result.policy_status, 'APPROVED', "Policy status should be APPROVED")
+        self.assertIn("Finance review", result.processing_message)
+
+    @patch('receipts.services.receipt_service.BlobService')
+    @patch('receipts.services.receipt_service.DocumentIntelligenceService')
+    def test_policy_fail_sets_rejected_status(self, mock_doc_intel_class, mock_blob_class):
+        """Policy failure should still set REJECTED (final)."""
+        # Mock blob service to return dummy PDF bytes
+        mock_blob = MagicMock()
+        mock_blob.download.return_value = b"%PDF-1.4\nDummy PDF content"
+        mock_blob_class.return_value = mock_blob
+
+        # Mock document intelligence to return valid extracted data in required structure
+        # Receipt is 40 days old, which should fail the 35-day policy
+        mock_doc_intel = MagicMock()
+        mock_doc_intel.analyze_receipt.return_value = {
+            'merchant': {'name': 'Test Vendor'},
+            'amounts': {'total': 100.00, 'currency': 'USD'},
+            'invoice': {'transaction_date': (date.today() - timedelta(days=40)).isoformat()},
+            'payment': {'method': 'Cash'},
+            'extraction': {'provider': 'azure_ai_document_intelligence'},
+        }
+        mock_doc_intel_class.return_value = mock_doc_intel
+
+        receipt = Receipt.objects.create(
+            owner="finance-user",
+            original_filename="receipt.pdf",
+            blob_name="receipts/finance-user/uuid/receipt.pdf",
+            mime_type="application/pdf",
+            file_size=1000,
+            sha256_hash="abc123",
+            transaction_date=date.today() - timedelta(days=40),
+            total_amount=Decimal("100.00"),
+            currency="USD",
+            vendor_name="Test Vendor",
+            normalized_json={"vendor_name": "Test Vendor"},
+        )
+
+        from receipts.services import ReceiptService
+        service = ReceiptService()
+        result = service.process_receipt(str(receipt.id))
+
+        self.assertEqual(result.status, 'REJECTED', "Policy-failing receipt should be REJECTED (final)")
+        self.assertEqual(result.policy_status, 'REJECTED', "Policy status should be REJECTED")
+
+    def test_needs_review_is_not_final(self):
+        """NEEDS_REVIEW status should not be in the final states."""
+        receipt = Receipt.objects.create(
+            owner="finance-user",
+            original_filename="receipt.pdf",
+            blob_name="receipts/finance-user/uuid/receipt.pdf",
+            mime_type="application/pdf",
+            file_size=1000,
+            sha256_hash="abc123",
+            transaction_date=date.today() - timedelta(days=10),
+            total_amount=Decimal("100.00"),
+            currency="USD",
+            vendor_name="Test Vendor",
+            status="NEEDS_REVIEW",
+            normalized_json={"vendor_name": "Test Vendor"},
+        )
+
+        self.assertFalse(receipt.is_final(), "NEEDS_REVIEW should not be a final state")
+
+    def test_approved_is_final(self):
+        """APPROVED status should be final."""
+        receipt = Receipt.objects.create(
+            owner="finance-user",
+            original_filename="receipt.pdf",
+            blob_name="receipts/finance-user/uuid/receipt.pdf",
+            mime_type="application/pdf",
+            file_size=1000,
+            sha256_hash="abc123",
+            status="APPROVED",
+        )
+
+        self.assertTrue(receipt.is_final(), "APPROVED should be a final state")
+
+    def test_rejected_is_final(self):
+        """REJECTED status should be final."""
+        receipt = Receipt.objects.create(
+            owner="finance-user",
+            original_filename="receipt.pdf",
+            blob_name="receipts/finance-user/uuid/receipt.pdf",
+            mime_type="application/pdf",
+            file_size=1000,
+            sha256_hash="abc123",
+            status="REJECTED",
+        )
+
+        self.assertTrue(receipt.is_final(), "REJECTED should be a final state")

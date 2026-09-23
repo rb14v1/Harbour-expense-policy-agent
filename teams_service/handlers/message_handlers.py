@@ -32,19 +32,19 @@ class FinanceMessageHandler:
 
         logger.info(f"Received message: {message_text}")
 
-        if "list" in message_text or "receipts" in message_text or message_text == "":
+        if "list" in message_text or "receipts" in message_text or message_text == "" or message_text == "hi" or message_text == "hello":
             return await self.handle_list_receipts(context)
         elif "detail" in message_text or "open" in message_text:
             return await self.handle_open_receipt(context)
         elif "help" in message_text:
             return self._get_help_message()
         else:
-            return self._get_welcome_message()
+            return await self.handle_list_receipts(context)
 
     async def handle_list_receipts(self, context: ActivityContext) -> dict:
-        """Handle request to list receipts."""
+        """Handle request to list Finance-pending receipts."""
         try:
-            response = await django_client.get_receipts(page=1)
+            response = await django_client.get_receipts(status="NEEDS_REVIEW", page=1)
 
             card = get_receipt_list_card(response.get("results", []))
 

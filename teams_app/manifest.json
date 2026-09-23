@@ -18,6 +18,14 @@
     "short": "Upload receipts and review expense claims.",
     "full": "Review and approve expense receipts with Teams. Temporary test package - Finance Review tab only."
   },
+  "bots": [
+    {
+      "botId": "08923630-1eab-4fed-a15c-9bb6f7bec5cf",
+      "scopes": [
+        "personal"
+      ]
+    }
+  ],
   "icons": {
     "outline": "assets/outline.png",
     "color": "assets/color.png"
@@ -43,6 +51,6 @@
 ],
   "webApplicationInfo": {
     "id": "08923630-1eab-4fed-a15c-9bb6f7bec5cf",
-    "resource": "api://unmentionable-zechariah-uncritically.ngrok-free.dev/08923630-1eab-4fed-a15c-9bb6f7bec5cf"
+    "resource": "api://tutu-deafening-overjoyed.ngrok-free.dev/08923630-1eab-4fed-a15c-9bb6f7bec5cf"
   }
 }

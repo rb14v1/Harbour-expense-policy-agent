@@ -337,3 +337,127 @@ class FinanceAmountFilteringTests(TestCase):
         data = response.json()
         self.assertEqual(data['count'], 1)
         self.assertEqual(Decimal(data['results'][0]['total_amount']), Decimal('100.00'))
+
+
+class FinancePendingReceiptListTests(TestCase):
+    """Tests for Part 1: Finance-pending receipt list filtering."""
+
+    def setUp(self):
+        self.client = Client()
+
+        self.needs_review_receipt1 = Receipt.objects.create(
+            owner='user1',
+            original_filename='needs_review1.pdf',
+            blob_name='receipts/user1/uuid1/needs_review1.pdf',
+            mime_type='application/pdf',
+            file_size=1000,
+            sha256_hash='hash1',
+            status='NEEDS_REVIEW',
+            vendor_name='Restaurant 1',
+            transaction_date=date.today() - timedelta(days=5),
+            total_amount=Decimal('100.00'),
+            currency='USD',
+            category='Food: Dinner - Max Claim: €/$/AUD 45 / INR700',
+            policy_status='APPROVED',
+            policy_result_json={'status': 'APPROVED', 'rules': [{'code': 'RECEIPT_AGE_OK', 'passed': True}]},
+            processing_message='Receipt approved by policy. Awaiting Finance review.',
+        )
+
+        self.needs_review_receipt2 = Receipt.objects.create(
+            owner='user2',
+            original_filename='needs_review2.pdf',
+            blob_name='receipts/user2/uuid2/needs_review2.pdf',
+            mime_type='application/pdf',
+            file_size=1000,
+            sha256_hash='hash2',
+            status='NEEDS_REVIEW',
+            vendor_name='Hotel XYZ',
+            transaction_date=date.today() - timedelta(days=3),
+            total_amount=Decimal('200.00'),
+            currency='USD',
+            category='Accommodation/Hotel',
+            policy_status='APPROVED',
+            policy_result_json={'status': 'APPROVED', 'rules': [{'code': 'RECEIPT_AGE_OK', 'passed': True}]},
+            processing_message='Receipt approved by policy. Awaiting Finance review.',
+        )
+
+        self.approved_receipt = Receipt.objects.create(
+            owner='user3',
+            original_filename='approved.pdf',
+            blob_name='receipts/user3/uuid3/approved.pdf',
+            mime_type='application/pdf',
+            file_size=1000,
+            sha256_hash='hash3',
+            status='APPROVED',
+            vendor_name='Restaurant 2',
+            transaction_date=date.today() - timedelta(days=10),
+            total_amount=Decimal('50.00'),
+            currency='USD',
+            category='Food: Dinner - Max Claim: €/$/AUD 45 / INR700',
+        )
+
+        self.rejected_receipt = Receipt.objects.create(
+            owner='user4',
+            original_filename='rejected.pdf',
+            blob_name='receipts/user4/uuid4/rejected.pdf',
+            mime_type='application/pdf',
+            file_size=1000,
+            sha256_hash='hash4',
+            status='REJECTED',
+            vendor_name='Restaurant 3',
+            transaction_date=date.today() - timedelta(days=40),
+            total_amount=Decimal('150.00'),
+            currency='USD',
+            category='Food: Dinner - Max Claim: €/$/AUD 45 / INR700',
+        )
+
+    def test_finance_pending_list_filters_needs_review(self):
+        """Test that filtering by NEEDS_REVIEW returns only pending Finance receipts."""
+        response = self.client.get('/finance/api/receipts/?status=NEEDS_REVIEW')
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+
+        # Should return only NEEDS_REVIEW receipts
+        self.assertEqual(data['count'], 2)
+        self.assertEqual(len(data['results']), 2)
+
+        for receipt in data['results']:
+            self.assertEqual(receipt['status'], 'NEEDS_REVIEW')
+
+    def test_finance_pending_excludes_approved(self):
+        """Test that APPROVED receipts are not included in NEEDS_REVIEW filter."""
+        response = self.client.get('/finance/api/receipts/?status=NEEDS_REVIEW')
+        data = response.json()
+
+        statuses = [r['status'] for r in data['results']]
+        self.assertNotIn('APPROVED', statuses)
+
+    def test_finance_pending_excludes_rejected(self):
+        """Test that REJECTED receipts are not included in NEEDS_REVIEW filter."""
+        response = self.client.get('/finance/api/receipts/?status=NEEDS_REVIEW')
+        data = response.json()
+
+        statuses = [r['status'] for r in data['results']]
+        self.assertNotIn('REJECTED', statuses)
+
+    def test_finance_pending_list_has_required_fields(self):
+        """Test that NEEDS_REVIEW receipts have all required fields for display."""
+        response = self.client.get('/finance/api/receipts/?status=NEEDS_REVIEW')
+        data = response.json()
+
+        # Receipts should have required fields for Finance review
+        required_fields = ['id', 'status', 'original_filename', 'vendor_name', 'transaction_date', 'total_amount', 'currency']
+        for receipt in data['results']:
+            for field in required_fields:
+                self.assertIn(field, receipt, f"Receipt missing field: {field}")
+
+    def test_finance_all_receipts_includes_pending(self):
+        """Test that unfiltered list includes NEEDS_REVIEW receipts."""
+        response = self.client.get('/finance/api/receipts/')
+        data = response.json()
+
+        # Should return all 4 receipts
+        self.assertEqual(data['count'], 4)
+
+        statuses = [r['status'] for r in data['results']]
+        self.assertIn('NEEDS_REVIEW', statuses)
