@@ -6,9 +6,9 @@
   "packageName": "com.expensepolicy.agent",
   "developer": {
     "name": "Finance Operations",
-    "websiteUrl": "https://tutu-deafening-overjoyed.ngrok-free.dev",
-"privacyUrl": "https://tutu-deafening-overjoyed.ngrok-free.dev/privacy",
-"termsOfUseUrl": "https://tutu-deafening-overjoyed.ngrok-free.dev/terms"
+    "websiteUrl": "https://jackeline-persons-gustavo.ngrok-free.dev",
+"privacyUrl": "https://jackeline-persons-gustavo.ngrok-free.dev/privacy",
+"termsOfUseUrl": "https://jackeline-persons-gustavo.ngrok-free.dev/terms"
   },
   "name": {
     "short": "Expense Policy Agent",
@@ -18,6 +18,14 @@
     "short": "Upload receipts and review expense claims.",
     "full": "Review and approve expense receipts with Teams. Temporary test package - Finance Review tab only."
   },
+  "bots": [
+    {
+      "botId": "08923630-1eab-4fed-a15c-9bb6f7bec5cf",
+      "scopes": [
+        "personal"
+      ]
+    }
+  ],
   "icons": {
     "outline": "assets/outline.png",
     "color": "assets/color.png"
@@ -27,8 +35,8 @@
     {
       "entityId": "finance-review",
       "name": "Finance Review",
-      "contentUrl": "https://tutu-deafening-overjoyed.ngrok-free.dev/finance/tab",
-      "websiteUrl": "https://tutu-deafening-overjoyed.ngrok-free.dev/finance/tab",
+      "contentUrl": "https://jackeline-persons-gustavo.ngrok-free.dev/finance/tab",
+      "websiteUrl": "https://jackeline-persons-gustavo.ngrok-free.dev/finance/tab",
       "scopes": [
         "personal"
       ]
@@ -38,11 +46,11 @@
     "identity"
   ],
   "validDomains": [
-  "tutu-deafening-overjoyed.ngrok-free.dev",
+  "jackeline-persons-gustavo.ngrok-free.dev",
   "teams.microsoft.com"
 ],
   "webApplicationInfo": {
     "id": "08923630-1eab-4fed-a15c-9bb6f7bec5cf",
-    "resource": "api://unmentionable-zechariah-uncritically.ngrok-free.dev/08923630-1eab-4fed-a15c-9bb6f7bec5cf"
+    "resource": "api://jackeline-persons-gustavo.ngrok-free.dev/08923630-1eab-4fed-a15c-9bb6f7bec5cf"
   }
 }

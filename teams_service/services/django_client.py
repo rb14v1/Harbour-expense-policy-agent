@@ -87,13 +87,18 @@ class DjangoReceiptClient:
         """
         Submit Finance decision on receipt (APPROVED or REJECTED).
 
+        Backend enforces:
+        - Receipt must be in NEEDS_REVIEW or UNIQUE status
+        - Cannot change APPROVED to REJECTED or vice versa
+        - Cannot approve/reject the same receipt twice
+
         Args:
             receipt_id: Receipt UUID
             decision: "APPROVED" or "REJECTED"
             notes: Optional decision notes
 
         Returns:
-            Updated receipt details
+            Updated receipt details (or error dict if validation fails)
         """
         if decision not in ["APPROVED", "REJECTED"]:
             raise ValueError(f"Invalid decision: {decision}. Must be APPROVED or REJECTED")
@@ -108,12 +113,20 @@ class DjangoReceiptClient:
                     f"{self.finance_api_url}/receipts/{receipt_id}/decision/",
                     json=payload,
                 )
+
+                if response.status_code == 404:
+                    logger.warning(f"Receipt not found: {receipt_id}")
+                    return None
+
+                # Handle validation errors from backend (400 status)
+                if response.status_code == 400:
+                    error_data = response.json()
+                    logger.warning(f"Decision validation error for receipt {receipt_id}: {error_data}")
+                    return error_data
+
                 response.raise_for_status()
                 return response.json()
             except httpx.HTTPStatusError as e:
-                if e.response.status_code == 404:
-                    logger.warning(f"Receipt not found: {receipt_id}")
-                    return None
                 logger.error(f"Error making decision for receipt {receipt_id}: {e}")
                 raise
 

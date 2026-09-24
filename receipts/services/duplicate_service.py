@@ -37,7 +37,7 @@ class DuplicateService:
 
         existing_receipts = Receipt.objects.filter(
             owner=receipt.owner,
-            status__in=['UNIQUE', 'APPROVED']
+            status__in=['UNIQUE', 'NEEDS_REVIEW', 'APPROVED']
         ).exclude(id=receipt.id)
 
         best_match = None

@@ -6,6 +6,7 @@ Handles Teams bot messages and invocations for Finance receipt review.
 import logging
 from typing import Optional, Any
 from microsoft_teams.apps.routing.activity_context import ActivityContext
+from microsoft_teams.cards import AdaptiveCard
 from teams_service.services.django_client import django_client
 from teams_service.cards.receipt_cards import (
     get_receipt_list_card,
@@ -20,11 +21,11 @@ logger = logging.getLogger(__name__)
 class FinanceMessageHandler:
     """Handles Finance-related Teams messages."""
 
-    async def handle_message(self, context: ActivityContext) -> Optional[Any]:
+    async def handle_message(self, context: ActivityContext) -> None:
         """
         Handle incoming Teams message.
 
-        Routes based on message content to appropriate handler.
+        Routes based on message content or Adaptive Card action to appropriate handler.
         """
         activity = context.activity
         message_text = activity.text if hasattr(activity, "text") else ""
@@ -32,125 +33,217 @@ class FinanceMessageHandler:
 
         logger.info(f"Received message: {message_text}")
 
-        if "list" in message_text or "receipts" in message_text or message_text == "":
-            return await self.handle_list_receipts(context)
+        # Check if this is an Adaptive Card action submission
+        value = getattr(activity, "value", None)
+        if value and isinstance(value, dict):
+            action = value.get("action", "").lower()
+            receipt_id = value.get("receipt_id", "")
+
+            logger.info(f"Received action: {action} for receipt: {receipt_id}")
+
+            if action == "open_receipt":
+                await self.handle_open_receipt(context, receipt_id)
+            elif action == "approve":
+                rejection_reason = value.get("rejection_reason", "").strip()
+                await self.handle_receipt_action(context, receipt_id, "approve", rejection_reason)
+            elif action == "reject":
+                rejection_reason = value.get("rejection_reason", "").strip()
+                await self.handle_receipt_action(context, receipt_id, "reject", rejection_reason)
+            elif action == "preview_receipt":
+                await self.handle_preview_action(context, receipt_id)
+            else:
+                logger.warning(f"Unknown action: {action}")
+                card_dict = get_error_card(f"Unknown action: {action}")
+                card = AdaptiveCard.model_validate(card_dict)
+                await context.send(card)
+            return
+
+        # Text-based message routing
+        if "list" in message_text or "receipts" in message_text or message_text == "" or message_text == "hi" or message_text == "hello":
+            await self.handle_list_receipts(context)
         elif "detail" in message_text or "open" in message_text:
-            return await self.handle_open_receipt(context)
+            await self.handle_open_receipt(context)
         elif "help" in message_text:
-            return self._get_help_message()
+            await context.send(self._get_help_message())
         else:
-            return self._get_welcome_message()
+            await self.handle_list_receipts(context)
 
-    async def handle_list_receipts(self, context: ActivityContext) -> dict:
-        """Handle request to list receipts."""
+    async def handle_list_receipts(self, context: ActivityContext) -> None:
+        """Handle request to list Finance-pending receipts."""
         try:
-            response = await django_client.get_receipts(page=1)
+            response = await django_client.get_receipts(status="NEEDS_REVIEW", page=1)
 
-            card = get_receipt_list_card(response.get("results", []))
+            card_dict = get_receipt_list_card(response.get("results", []))
+            card = AdaptiveCard.model_validate(card_dict)
 
-            return {
-                "type": "message",
-                "attachments": [
-                    {
-                        "contentType": "application/vnd.microsoft.card.adaptive",
-                        "contentUrl": None,
-                        "content": card,
-                    }
-                ],
-            }
+            await context.send(card)
         except Exception as e:
             logger.error(f"Error listing receipts: {e}")
-            card = get_error_card("Could not retrieve receipts. Please try again later.")
-            return {
-                "type": "message",
-                "attachments": [
-                    {
-                        "contentType": "application/vnd.microsoft.card.adaptive",
-                        "contentUrl": None,
-                        "content": card,
-                    }
-                ],
-            }
+            card_dict = get_error_card("Could not retrieve receipts. Please try again later.")
+            card = AdaptiveCard.model_validate(card_dict)
+            await context.send(card)
 
-    async def handle_open_receipt(self, context: ActivityContext) -> dict:
+    async def handle_open_receipt(self, context: ActivityContext, receipt_id: Optional[str] = None) -> None:
         """
         Handle request to open/view receipt details.
 
-        In a real implementation, this would parse receipt ID from message
-        or use Teams deep link data.
+        If receipt_id is provided (from action), fetch and display that receipt.
+        Otherwise, return error message.
         """
-        return {
-            "type": "message",
-            "text": "Please use the Finance Review tab to open receipt details and make decisions.",
-        }
+        if not receipt_id:
+            await context.send("Please select a receipt from the list above.")
+            return
+
+        try:
+            receipt = await django_client.get_receipt_detail(receipt_id)
+
+            if receipt is None:
+                card_dict = get_error_card(f"Receipt {receipt_id} not found.")
+                card = AdaptiveCard.model_validate(card_dict)
+                await context.send(card)
+                return
+
+            card_dict = get_receipt_detail_card(receipt)
+            card = AdaptiveCard.model_validate(card_dict)
+
+            await context.send(card)
+
+        except Exception as e:
+            logger.error(f"Error opening receipt {receipt_id}: {e}")
+            card_dict = get_error_card(f"Could not load receipt {receipt_id}. Please try again later.")
+            card = AdaptiveCard.model_validate(card_dict)
+            await context.send(card)
 
     async def handle_receipt_action(
-        self, context: ActivityContext, receipt_id: str, action: str
-    ) -> dict:
+        self, context: ActivityContext, receipt_id: str, action: str, notes: str = ""
+    ) -> None:
         """
         Handle Finance decision action (approve/reject).
 
         Called from Teams adaptive card action.
+
+        Backend validation ensures:
+        - Receipt must be in NEEDS_REVIEW or UNIQUE status
+        - Cannot change APPROVED to REJECTED or vice versa
+        - Cannot approve/reject the same receipt twice
+
+        Args:
+            context: Activity context
+            receipt_id: Receipt UUID
+            action: "approve" or "reject"
+            notes: Optional rejection reason or approval notes
         """
+        if not receipt_id:
+            card_dict = get_error_card("Receipt ID is missing.")
+            card = AdaptiveCard.model_validate(card_dict)
+            await context.send(card)
+            return
+
         if action not in ["approve", "reject"]:
-            return get_error_card(f"Invalid action: {action}")
+            card_dict = get_error_card(f"Invalid action: {action}")
+            card = AdaptiveCard.model_validate(card_dict)
+            await context.send(card)
+            return
 
         decision = "APPROVED" if action == "approve" else "REJECTED"
 
         try:
             # Submit decision to Django
-            result = await django_client.make_receipt_decision(receipt_id, decision)
+            result = await django_client.make_receipt_decision(receipt_id, decision, notes=notes if notes else None)
 
             if result is None:
-                return get_error_card(f"Receipt {receipt_id} not found.")
+                card_dict = get_error_card(f"Receipt {receipt_id} not found.")
+                card = AdaptiveCard.model_validate(card_dict)
+                await context.send(card)
+                return
 
-            card = get_decision_confirmation_card(receipt_id, decision)
+            # Check for backend validation errors
+            if "error" in result and isinstance(result, dict):
+                error_msg = result.get("error", "Decision could not be submitted")
+                card_dict = get_error_card(error_msg)
+                card = AdaptiveCard.model_validate(card_dict)
+                await context.send(card)
+                return
 
-            return {
-                "type": "message",
-                "attachments": [
-                    {
-                        "contentType": "application/vnd.microsoft.card.adaptive",
-                        "contentUrl": None,
-                        "content": card,
-                    }
-                ],
-            }
+            card_dict = get_decision_confirmation_card(receipt_id, decision, notes=notes if notes else None)
+            card = AdaptiveCard.model_validate(card_dict)
+
+            await context.send(card)
 
         except Exception as e:
             logger.error(f"Error making decision for receipt {receipt_id}: {e}")
-            return get_error_card(
+            card_dict = get_error_card(
                 f"Could not submit decision for receipt {receipt_id}. Please try again."
             )
+            card = AdaptiveCard.model_validate(card_dict)
+            await context.send(card)
+
+    async def handle_preview_action(self, context: ActivityContext, receipt_id: str) -> None:
+        """
+        Handle receipt preview action.
+
+        Returns a message with preview URL that Finance can use to view the receipt.
+        """
+        if not receipt_id:
+            card_dict = get_error_card("Receipt ID is missing.")
+            card = AdaptiveCard.model_validate(card_dict)
+            await context.send(card)
+            return
+
+        try:
+            preview_url = await django_client.get_receipt_preview_url(receipt_id)
+
+            card_dict = {
+                "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+                "type": "AdaptiveCard",
+                "version": "1.4",
+                "body": [
+                    {
+                        "type": "TextBlock",
+                        "text": "Receipt Preview",
+                        "weight": "bolder",
+                        "size": "large",
+                    }
+                ],
+                "actions": [
+                    {
+                        "type": "Action.OpenUrl",
+                        "title": "🔗 View Receipt File",
+                        "url": preview_url,
+                    }
+                ]
+            }
+            card = AdaptiveCard.model_validate(card_dict)
+            await context.send(card)
+
+        except Exception as e:
+            logger.error(f"Error getting preview for receipt {receipt_id}: {e}")
+            card_dict = get_error_card(f"Could not load preview for receipt {receipt_id}.")
+            card = AdaptiveCard.model_validate(card_dict)
+            await context.send(card)
 
     @staticmethod
-    def _get_welcome_message() -> dict:
+    def _get_welcome_message() -> str:
         """Get welcome message."""
-        return {
-            "type": "message",
-            "text": "Welcome to Expense Policy Agent - Finance Review!\n\n"
-            "Available commands:\n"
-            "- **list** — View receipts\n"
-            "- **help** — Get help\n\n"
-            "Or use the Finance Review tab to see all receipts and make decisions.",
-        }
+        return ("Welcome to Expense Policy Agent - Finance Review!\n\n"
+                "Available commands:\n"
+                "- **list** — View receipts\n"
+                "- **help** — Get help\n\n"
+                "Or use the Finance Review tab to see all receipts and make decisions.")
 
     @staticmethod
-    def _get_help_message() -> dict:
+    def _get_help_message() -> str:
         """Get help message."""
-        return {
-            "type": "message",
-            "text": "**Expense Policy Agent - Finance Review**\n\n"
-            "**Commands:**\n"
-            "- **list** — List receipts\n"
-            "- **detail** — View receipt details\n\n"
-            "**Actions in Finance Tab:**\n"
-            "- View receipt list with filters\n"
-            "- See receipt details and duplicate information\n"
-            "- Preview receipt file\n"
-            "- Approve or reject receipts\n\n"
-            "Questions? Contact support.",
-        }
+        return ("**Expense Policy Agent - Finance Review**\n\n"
+                "**Commands:**\n"
+                "- **list** — List receipts\n"
+                "- **detail** — View receipt details\n\n"
+                "**Actions in Finance Tab:**\n"
+                "- View receipt list with filters\n"
+                "- See receipt details and duplicate information\n"
+                "- Preview receipt file\n"
+                "- Approve or reject receipts\n\n"
+                "Questions? Contact support.")
 
 
 # Create global handler instance

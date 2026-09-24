@@ -44,15 +44,16 @@ app = FastAPI(
 logger.info("Initializing Teams SDK...")
 
 try:
+    # Create FastAPI adapter for Teams SDK (must be done before creating App)
+    adapter = FastAPIAdapter(app=app)
+
     teams_options = config.get_teams_options()
 
     teams_app = App(
         **teams_options,
+        http_server_adapter=adapter,
         dangerously_allow_unauthenticated_requests=config.SKIP_TEAMS_AUTH,
     )
-
-    # Create FastAPI adapter for Teams SDK
-    adapter = FastAPIAdapter(app=app)
 
     logger.info("Teams SDK initialized successfully")
 
@@ -61,26 +62,31 @@ except Exception as e:
     raise
 
 
+# Initialize Teams SDK on startup (registers /api/messages route)
+async def _init_teams_app():
+    """Initialize Teams SDK when FastAPI starts."""
+    try:
+        if not teams_app._initialized:
+            await teams_app.initialize()
+            logger.info("Teams app initialized and /api/messages route registered")
+    except Exception as e:
+        logger.error(f"Failed to initialize Teams app on startup: {e}")
+        raise
+
+
 # Register message handlers
 @teams_app.on_message()
 async def on_message(context):
     """Handle incoming Teams messages."""
     activity = context.activity
-    from_id = activity.from_property.id if activity.from_property else "unknown"
+    from_id = activity.from_.id if activity.from_ else "unknown"
     logger.info(f"Message received from {from_id}")
 
     try:
-        response = await finance_handler.handle_message(context)
-
-        if response:
-            # Return response through Teams SDK
-            return response
+        await finance_handler.handle_message(context)
     except Exception as e:
         logger.error(f"Error processing message: {e}")
-        return {
-            "type": "message",
-            "text": "An error occurred. Please try again later.",
-        }
+        await context.send("An error occurred. Please try again later.")
 
 
 # HTTP endpoints
@@ -103,20 +109,6 @@ async def get_config_info():
         "django_api": config.DJANGO_API_URL,
         "debug": config.DEBUG,
     }
-
-
-@app.post("/api/messages", tags=["Teams"])
-async def messages(request: Request):
-    """
-    Teams messaging endpoint.
-
-    Receives Teams activities and routes them to Teams SDK.
-    This endpoint is configured in Teams manifest.
-    """
-    # The FastAPIAdapter handles routing to the Teams SDK
-    # This endpoint is called by Teams for all activities
-    logger.debug(f"Received Teams activity on /api/messages")
-    return Response(status_code=202)  # Accepted
 
 
 # Finance API Proxy Endpoints
@@ -957,12 +949,16 @@ async def root():
     }
 
 
-# Log startup
+# Startup handlers
 @app.on_event("startup")
 async def startup_event():
-    """Log when service starts."""
+    """Initialize Teams SDK and log when service starts."""
     logger.info("="*60)
     config.log_config_summary()
+
+    # Initialize Teams SDK (registers /api/messages route)
+    await _init_teams_app()
+
     logger.info("Expense Policy Agent Teams Service is ready")
     logger.info("Teams messaging endpoint: /api/messages")
     logger.info("="*60)
