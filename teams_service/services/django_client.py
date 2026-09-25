@@ -152,8 +152,9 @@ class DjangoReceiptClient:
 
         Returns secure Django-served URL, not direct Blob access.
         Uses public URL for Teams mobile and external clients.
+        Uses explicit /download endpoint to avoid APPEND_SLASH redirect issues on Teams mobile.
         """
-        return f"{config.DJANGO_PUBLIC_API_URL}/receipts/{receipt_id}/preview/"
+        return f"{config.DJANGO_PUBLIC_API_URL}/receipts/{receipt_id}/download"
 
     async def get_categories(self) -> List[str]:
         """

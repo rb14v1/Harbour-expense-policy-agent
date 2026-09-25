@@ -913,6 +913,81 @@ class ReceiptPreviewTests(TestCase):
             self.assertEqual(response['Content-Type'], 'application/pdf')
             mock_download.assert_called_with('receipts/reject-test/uuid/receipt.pdf')
 
+    def test_receipt_preview_pdf_returns_attachment_disposition(self):
+        """Test that PDF files return Content-Disposition: attachment for reliable mobile download."""
+        from django.test import Client
+
+        pdf_content = b"%PDF-1.4\ntest pdf content"
+
+        receipt = Receipt.objects.create(
+            owner="pdf-test",
+            original_filename="invoice.pdf",
+            blob_name="receipts/pdf-test/uuid/invoice.pdf",
+            mime_type="application/pdf",
+            file_size=len(pdf_content),
+            sha256_hash="pdf123",
+        )
+
+        client = Client()
+        with patch('receipts.views.BlobService.download') as mock_download:
+            mock_download.return_value = pdf_content
+            response = client.get(f'/api/v1/receipts/{receipt.id}/preview/?owner=pdf-test')
+
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response['Content-Type'], 'application/pdf')
+            # Critical for mobile: PDF must use attachment disposition
+            self.assertIn('attachment', response['Content-Disposition'])
+            self.assertIn('invoice.pdf', response['Content-Disposition'])
+
+    def test_receipt_preview_jpg_returns_inline_disposition(self):
+        """Test that image files return Content-Disposition: inline for browser display."""
+        from django.test import Client
+
+        jpg_content = bytes([0xFF, 0xD8, 0xFF, 0xE0]) + b"JFIF" + (b"x" * 200) + bytes([0xFF, 0xD9])
+
+        receipt = Receipt.objects.create(
+            owner="image-test",
+            original_filename="receipt.jpg",
+            blob_name="receipts/image-test/uuid/receipt.jpg",
+            mime_type="image/jpeg",
+            file_size=len(jpg_content),
+            sha256_hash="jpg123",
+        )
+
+        client = Client()
+        with patch('receipts.views.BlobService.download') as mock_download:
+            mock_download.return_value = jpg_content
+            response = client.get(f'/api/v1/receipts/{receipt.id}/preview/?owner=image-test')
+
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response['Content-Type'], 'image/jpeg')
+            # Images should use inline disposition for browser display on mobile
+            self.assertIn('inline', response['Content-Disposition'])
+
+    def test_receipt_preview_png_returns_inline_disposition(self):
+        """Test that PNG image files return Content-Disposition: inline."""
+        from django.test import Client
+
+        png_content = b'\x89PNG\r\n\x1a\n' + (b"x" * 100)
+
+        receipt = Receipt.objects.create(
+            owner="png-test",
+            original_filename="receipt.png",
+            blob_name="receipts/png-test/uuid/receipt.png",
+            mime_type="image/png",
+            file_size=len(png_content),
+            sha256_hash="png123",
+        )
+
+        client = Client()
+        with patch('receipts.views.BlobService.download') as mock_download:
+            mock_download.return_value = png_content
+            response = client.get(f'/api/v1/receipts/{receipt.id}/preview/?owner=png-test')
+
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response['Content-Type'], 'image/png')
+            self.assertIn('inline', response['Content-Disposition'])
+
 
 class UploadErrorHandlingTests(TestCase):
     """Tests for error message propagation in upload flow."""
@@ -1398,3 +1473,281 @@ class FinancePendingReceiptWorkflowTests(TestCase):
         data = response.json()
         self.assertEqual(data['status'], 'NEEDS_REVIEW')
         self.assertEqual(data['processing_message'], "Receipt has been validated and approved by policy. Awaiting Finance review.")
+
+    def test_receipt_preview_pdf_returns_attachment_disposition(self):
+        """Test that PDF files return Content-Disposition: attachment for reliable mobile download."""
+        from django.test import Client
+
+        pdf_content = b"%PDF-1.4\ntest pdf content"
+
+        receipt = Receipt.objects.create(
+            owner="pdf-test",
+            original_filename="invoice.pdf",
+            blob_name="receipts/pdf-test/uuid/invoice.pdf",
+            mime_type="application/pdf",
+            file_size=len(pdf_content),
+            sha256_hash="pdf123",
+        )
+
+        client = Client()
+        with patch('receipts.views.BlobService.download') as mock_download:
+            mock_download.return_value = pdf_content
+            response = client.get(f'/api/v1/receipts/{receipt.id}/preview/?owner=pdf-test')
+
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response['Content-Type'], 'application/pdf')
+            # Critical for mobile: PDF must use attachment disposition
+            self.assertIn('attachment', response['Content-Disposition'])
+            self.assertIn('invoice.pdf', response['Content-Disposition'])
+
+    def test_receipt_preview_jpg_returns_inline_disposition(self):
+        """Test that image files return Content-Disposition: inline for browser display."""
+        from django.test import Client
+
+        jpg_content = bytes([0xFF, 0xD8, 0xFF, 0xE0]) + b"JFIF" + (b"x" * 200) + bytes([0xFF, 0xD9])
+
+        receipt = Receipt.objects.create(
+            owner="image-test",
+            original_filename="receipt.jpg",
+            blob_name="receipts/image-test/uuid/receipt.jpg",
+            mime_type="image/jpeg",
+            file_size=len(jpg_content),
+            sha256_hash="jpg123",
+        )
+
+        client = Client()
+        with patch('receipts.views.BlobService.download') as mock_download:
+            mock_download.return_value = jpg_content
+            response = client.get(f'/api/v1/receipts/{receipt.id}/preview/?owner=image-test')
+
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response['Content-Type'], 'image/jpeg')
+            # Images should use inline disposition for browser display on mobile
+            self.assertIn('inline', response['Content-Disposition'])
+
+    def test_receipt_preview_png_returns_inline_disposition(self):
+        """Test that PNG image files return Content-Disposition: inline."""
+        from django.test import Client
+
+        png_content = b'\x89PNG\r\n\x1a\n' + (b"x" * 100)
+
+        receipt = Receipt.objects.create(
+            owner="png-test",
+            original_filename="receipt.png",
+            blob_name="receipts/png-test/uuid/receipt.png",
+            mime_type="image/png",
+            file_size=len(png_content),
+            sha256_hash="png123",
+        )
+
+        client = Client()
+        with patch('receipts.views.BlobService.download') as mock_download:
+            mock_download.return_value = png_content
+            response = client.get(f'/api/v1/receipts/{receipt.id}/preview/?owner=png-test')
+
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response['Content-Type'], 'image/png')
+            self.assertIn('inline', response['Content-Disposition'])
+
+    def test_receipt_preview_pdf_without_extension_still_attachment(self):
+        """Test that PDFs without .pdf extension still use attachment disposition."""
+        from django.test import Client
+
+        pdf_content = b"%PDF-1.4\ntest"
+
+        receipt = Receipt.objects.create(
+            owner="pdf-noext",
+            original_filename="invoice",  # No .pdf extension
+            blob_name="receipts/pdf-noext/uuid/invoice",
+            mime_type="application/pdf",
+            file_size=len(pdf_content),
+            sha256_hash="pdfnoext123",
+        )
+
+        client = Client()
+        with patch('receipts.views.BlobService.download') as mock_download:
+            mock_download.return_value = pdf_content
+            response = client.get(f'/api/v1/receipts/{receipt.id}/preview/?owner=pdf-noext')
+
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response['Content-Type'], 'application/pdf')
+            self.assertIn('attachment', response['Content-Disposition'])
+            # Should add .pdf extension if missing
+
+
+class ReceiptDownloadEndpointTests(TestCase):
+    """Tests for explicit /download endpoint (avoids APPEND_SLASH redirect)."""
+
+    def test_download_get_returns_pdf_content(self):
+        """Test that GET /download returns PDF file content."""
+        from django.test import Client
+
+        pdf_content = b"%PDF-1.4\ntest content"
+        receipt = Receipt.objects.create(
+            owner="default-user",
+            original_filename="receipt.pdf",
+            blob_name="receipts/default-user/uuid/receipt.pdf",
+            mime_type="application/pdf",
+            file_size=len(pdf_content),
+            sha256_hash="download_pdf_test",
+        )
+
+        client = Client()
+        with patch('receipts.views.BlobService.download') as mock_download:
+            mock_download.return_value = pdf_content
+            response = client.get(f'/api/v1/receipts/{receipt.id}/download?owner=default-user')
+
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response['Content-Type'], 'application/pdf')
+            self.assertIn('inline', response['Content-Disposition'])
+            self.assertEqual(b''.join(response.streaming_content), pdf_content)
+
+    def test_download_head_returns_headers_no_redirect(self):
+        """Test that HEAD /download returns 200 with proper headers (no 301 redirect)."""
+        from django.test import Client
+
+        pdf_content = b"%PDF-1.4\ntest content"
+        receipt = Receipt.objects.create(
+            owner="default-user",
+            original_filename="receipt.pdf",
+            blob_name="receipts/default-user/uuid/receipt.pdf",
+            mime_type="application/pdf",
+            file_size=len(pdf_content),
+            sha256_hash="download_head_test",
+        )
+
+        client = Client()
+        with patch('receipts.views.BlobService.download') as mock_download:
+            mock_download.return_value = pdf_content
+            # HEAD request should NOT get a 301 redirect
+            response = client.head(f'/api/v1/receipts/{receipt.id}/download?owner=default-user')
+
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response['Content-Type'], 'application/pdf')
+            self.assertIn('inline', response['Content-Disposition'])
+            # HEAD response should have Content-Length
+            self.assertEqual(response['Content-Length'], str(len(pdf_content)))
+            # HEAD response should NOT have body
+            self.assertEqual(b''.join(response.streaming_content), b'')
+
+    def test_download_head_without_trailing_slash_no_redirect(self):
+        """Test that HEAD without trailing slash returns 200 (not 301)."""
+        from django.test import Client
+
+        pdf_content = b"%PDF-1.4\ntest"
+        receipt = Receipt.objects.create(
+            owner="default-user",
+            original_filename="receipt.pdf",
+            blob_name="receipts/default-user/uuid/receipt.pdf",
+            mime_type="application/pdf",
+            file_size=len(pdf_content),
+            sha256_hash="download_head_no_slash",
+        )
+
+        client = Client()
+        with patch('receipts.views.BlobService.download') as mock_download:
+            mock_download.return_value = pdf_content
+            # Test without trailing slash - should NOT redirect
+            response = client.head(f'/api/v1/receipts/{receipt.id}/download?owner=default-user',
+                                  follow=False)
+
+            # Key test: should be 200, not 301
+            self.assertEqual(response.status_code, 200)
+            self.assertNotEqual(response.status_code, 301)
+
+    def test_download_authorization(self):
+        """Test that /download respects Finance authorization."""
+        from django.test import Client
+
+        receipt = Receipt.objects.create(
+            owner="user-a",
+            original_filename="receipt.pdf",
+            blob_name="receipts/user-a/uuid/receipt.pdf",
+            mime_type="application/pdf",
+            file_size=100,
+            sha256_hash="download_auth_test",
+        )
+
+        client = Client()
+        # User B cannot access User A's receipt
+        response = client.get(f'/api/v1/receipts/{receipt.id}/download?owner=user-b')
+        self.assertEqual(response.status_code, 403)
+
+        # User A can access their own receipt
+        with patch('receipts.views.BlobService.download') as mock_download:
+            mock_download.return_value = b"%PDF-1.4"
+            response = client.get(f'/api/v1/receipts/{receipt.id}/download?owner=user-a')
+            self.assertEqual(response.status_code, 200)
+
+        # Finance department can access any receipt
+        with patch('receipts.views.BlobService.download') as mock_download:
+            mock_download.return_value = b"%PDF-1.4"
+            response = client.get(f'/api/v1/receipts/{receipt.id}/download?owner=finance-department')
+            self.assertEqual(response.status_code, 200)
+
+    def test_download_exact_duplicate_access(self):
+        """Test that /download allows access to original file for exact duplicate."""
+        from django.test import Client
+
+        original_pdf = b"%PDF-1.4\noriginal"
+        original = Receipt.objects.create(
+            owner="default-user",
+            original_filename="original.pdf",
+            blob_name="receipts/default-user/uuid/original.pdf",
+            mime_type="application/pdf",
+            file_size=len(original_pdf),
+            sha256_hash="original_hash",
+            status='UNIQUE',
+        )
+
+        duplicate = Receipt.objects.create(
+            owner="default-user",
+            original_filename="duplicate.pdf",
+            blob_name="",  # No blob for duplicate
+            mime_type="application/pdf",
+            file_size=0,
+            sha256_hash="duplicate_hash",
+            status='EXACT_DUPLICATE',
+            exact_duplicate_of=original,
+        )
+
+        client = Client()
+        with patch('receipts.views.BlobService.download') as mock_download:
+            mock_download.return_value = original_pdf
+            # Request duplicate should return original file
+            response = client.get(f'/api/v1/receipts/{duplicate.id}/download?owner=default-user')
+
+            self.assertEqual(response.status_code, 200)
+            # Verify it called download with the ORIGINAL blob name
+            mock_download.assert_called_with(original.blob_name)
+
+    def test_download_image_returns_inline(self):
+        """Test that /download returns inline disposition for images."""
+        from django.test import Client
+
+        image_content = b'\x89PNG\r\n\x1a\n' + (b"x" * 100)
+        receipt = Receipt.objects.create(
+            owner="default-user",
+            original_filename="receipt.png",
+            blob_name="receipts/default-user/uuid/receipt.png",
+            mime_type="image/png",
+            file_size=len(image_content),
+            sha256_hash="download_image_test",
+        )
+
+        client = Client()
+        with patch('receipts.views.BlobService.download') as mock_download:
+            mock_download.return_value = image_content
+            response = client.get(f'/api/v1/receipts/{receipt.id}/download?owner=default-user')
+
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response['Content-Type'], 'image/png')
+            self.assertIn('inline', response['Content-Disposition'])
+
+    def test_download_missing_receipt_returns_404(self):
+        """Test that /download returns 404 for missing receipt."""
+        from django.test import Client
+
+        client = Client()
+        response = client.get('/api/v1/receipts/00000000-0000-0000-0000-000000000000/download?owner=default-user')
+        self.assertEqual(response.status_code, 404)

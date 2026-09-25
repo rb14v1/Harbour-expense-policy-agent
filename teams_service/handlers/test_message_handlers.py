@@ -241,6 +241,49 @@ class FinanceMessageHandlerTests(IsolatedAsyncioTestCase):
             card_arg = call_args[0][0]
             self.assertIsNotNone(card_arg)
 
+    async def test_preview_action_response_contains_openurl_action(self):
+        """Test that preview action response contains Action.OpenUrl with /download URL."""
+        handler = FinanceMessageHandler()
+        receipt_id = "receipt-456"
+
+        context = MagicMock()
+        context.activity.value = {
+            "action": "preview_receipt",
+            "receipt_id": receipt_id,
+        }
+        context.activity.text = None
+        context.send = AsyncMock()
+
+        with patch('teams_service.handlers.message_handlers.django_client') as mock_client:
+            preview_url = f"https://example.ngrok-free.dev/api/v1/receipts/{receipt_id}/download"
+            mock_client.get_receipt_preview_url = AsyncMock(return_value=preview_url)
+
+            await handler.handle_message(context)
+
+            # Verify preview URL was requested
+            mock_client.get_receipt_preview_url.assert_called_once_with(receipt_id)
+
+            # Verify context.send was called
+            context.send.assert_called_once()
+
+            # Get the card that was sent
+            call_args = context.send.call_args
+            card_arg = call_args[0][0]
+
+            # Card should have actions array
+            card_dict = card_arg.model_dump()
+            actions = card_dict.get("actions", [])
+
+            # Should have at least 1 action
+            self.assertGreater(len(actions), 0)
+
+            # First action should be Action.OpenUrl
+            action = actions[0]
+            self.assertEqual(action["type"], "Action.OpenUrl")
+            self.assertEqual(action["title"], "🔗 View Receipt File")
+            self.assertEqual(action["url"], preview_url)
+            self.assertIn("/download", action["url"])
+
 
 # Part 2: Adaptive Card Actions and Receipt Review Workflow Tests
 class FinanceMessageHandlerPart2Tests(IsolatedAsyncioTestCase):
@@ -631,8 +674,8 @@ class DjangoClientConfigTests(IsolatedAsyncioTestCase):
         # Call the method
         preview_url = await client.get_receipt_preview_url(receipt_id)
 
-        # Verify it uses DJANGO_PUBLIC_API_URL
-        expected_url = f"{config.DJANGO_PUBLIC_API_URL}/receipts/{receipt_id}/preview/"
+        # Verify it uses DJANGO_PUBLIC_API_URL and /download endpoint (no trailing slash, avoids APPEND_SLASH redirect)
+        expected_url = f"{config.DJANGO_PUBLIC_API_URL}/receipts/{receipt_id}/download"
         self.assertEqual(preview_url, expected_url)
 
         # Verify it does NOT contain DJANGO_API_URL (localhost) when DJANGO_PUBLIC_API_URL is set
@@ -649,7 +692,8 @@ class DjangoClientConfigTests(IsolatedAsyncioTestCase):
 
         # Verify receipt ID is in the URL
         self.assertIn(receipt_id, preview_url)
-        self.assertIn("/preview/", preview_url)
+        # Verify endpoint is /download (not /preview/, avoids APPEND_SLASH redirect)
+        self.assertIn("/download", preview_url)
 
     async def test_get_receipt_preview_url_is_https_for_ngrok(self):
         """Test that preview URL uses HTTPS when DJANGO_PUBLIC_API_URL is a public domain."""
@@ -712,7 +756,11 @@ class DashboardActivityUpdateTests(IsolatedAsyncioTestCase):
             self.assertEqual(update_call.kwargs["activity_id"], "bootstrap-activity-id")
 
     async def test_apply_filters_uses_activity_id_for_update(self):
-        """Test that apply filters action uses activity_id from payload to update dashboard."""
+        """Test that apply filters action sends a NEW filtered results card (not an update).
+
+        The new design separates filter UI from filtered results.
+        When filters are applied, a new filtered-results card is sent WITHOUT filter controls.
+        """
         handler = FinanceMessageHandler()
         context = MagicMock()
         context.activity.conversation.id = "conv-123"
@@ -721,8 +769,8 @@ class DashboardActivityUpdateTests(IsolatedAsyncioTestCase):
         context.api.conversations.update_activity = AsyncMock()
 
         value = {
-            "activity_id": "activity-456",  # Activity ID from bootstrap card
-            "filter_status": "NEEDS_REVIEW",
+            "activity_id": "activity-456",
+            "filter_status": "APPROVED",
             "filter_category": "",
             "filter_year": "",
             "filter_date_from": "",
@@ -736,18 +784,14 @@ class DashboardActivityUpdateTests(IsolatedAsyncioTestCase):
                 "count": 0,
                 "results": [],
                 "next": None,
-                "previous": None,
             })
-            mock_client.get_categories = AsyncMock(return_value=[])
-            mock_client.get_available_years = AsyncMock(return_value=[])
 
             await handler.handle_apply_filters(context, value)
 
-            # Should use update_activity with the activity_id from payload
-            context.api.conversations.update_activity.assert_called_once()
-            call_args = context.api.conversations.update_activity.call_args
-            self.assertEqual(call_args.kwargs["conversation_id"], "conv-123")
-            self.assertEqual(call_args.kwargs["activity_id"], "activity-456")
+            # Should send a new filtered results card, NOT update
+            context.send.assert_called_once()
+            # Should NOT use update_activity for filtered results
+            context.api.conversations.update_activity.assert_not_called()
 
     async def test_clear_filters_updates_existing_activity(self):
         """Test that clear filters action with activity_id updates the dashboard."""
@@ -870,7 +914,12 @@ class DashboardBootstrapTests(IsolatedAsyncioTestCase):
             self.assertEqual(update_call.kwargs["activity_id"], "dash-activity-456")
 
     async def test_apply_filters_with_activity_id_uses_update_not_send(self):
-        """Test that apply filters with activity_id uses update_activity, not send."""
+        """Test that applying filters sends a new filtered-results card.
+
+        The new design intentionally sends separate cards:
+        - Initial dashboard: contains filter controls
+        - Filtered results: contains ONLY results, NO filter controls
+        """
         handler = FinanceMessageHandler()
         context = MagicMock()
         context.activity.conversation.id = "conv-123"
@@ -895,18 +944,14 @@ class DashboardBootstrapTests(IsolatedAsyncioTestCase):
                 "results": [{"id": "r1", "vendor_name": "V1", "total_amount": "100.00"}],
                 "next": None,
             })
-            mock_client.get_categories = AsyncMock(return_value=[])
-            mock_client.get_available_years = AsyncMock(return_value=[])
 
             await handler.handle_apply_filters(context, value)
 
-            # Should NOT send new message during normal filter apply
-            context.send.assert_not_called()
+            # With filters applied, should send a new filtered results card
+            context.send.assert_called_once()
 
-            # Should update existing activity
-            context.api.conversations.update_activity.assert_called_once()
-            update_call = context.api.conversations.update_activity.call_args
-            self.assertEqual(update_call.kwargs["activity_id"], "dash-activity-existing")
+            # Should NOT use update_activity (we're sending a separate new card)
+            context.api.conversations.update_activity.assert_not_called()
 
     async def test_apply_filters_without_activity_id_logs_warning(self):
         """Test that apply filters without activity_id logs a warning."""

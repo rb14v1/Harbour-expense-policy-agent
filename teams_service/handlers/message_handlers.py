@@ -14,6 +14,7 @@ from teams_service.cards.receipt_cards import (
     get_decision_confirmation_card,
     get_error_card,
     get_receipt_dashboard_card,
+    get_filtered_results_card,
 )
 
 logger = logging.getLogger(__name__)
@@ -262,14 +263,16 @@ class FinanceMessageHandler:
         amount_max: Optional[str] = None,
         dashboard_activity_id: Optional[str] = None,
     ) -> None:
-        """Handle request to display Finance Dashboard with all receipts and filters.
+        """Handle request to display Finance Dashboard with all receipts and optional filters.
 
-        Bootstrap mechanism:
-        - First call (dashboard_activity_id=None): sends initial card, then immediately
-          updates it with activity_id embedded in action payloads (so future actions can update).
-        - Subsequent calls (dashboard_activity_id provided): updates existing activity.
+        Behavior:
+        - No filters provided: Send full Dashboard card WITH filter controls and bootstrap with activity_id
+        - Filters provided: Send Filtered Results card WITHOUT filter controls (separate new message)
         """
         try:
+            # Check if ANY filter is applied
+            has_filters = any([status, category, year, date_from, date_to, amount_min, amount_max])
+
             date_from_api = None
             date_to_api = None
             if year and year != "":
@@ -292,6 +295,26 @@ class FinanceMessageHandler:
             receipts = response.get("results", [])
             has_next = response.get("next") is not None
 
+            # If filters are applied, send filtered results card (simpler, no filter UI)
+            if has_filters:
+                logger.debug(f"Filters applied, sending filtered results card")
+                card_dict = get_filtered_results_card(
+                    receipts,
+                    page=page,
+                    has_next=has_next,
+                    status=status,
+                    category=category,
+                    year=year,
+                    date_from=date_from,
+                    date_to=date_to,
+                    amount_min=amount_min,
+                    amount_max=amount_max,
+                )
+                card = AdaptiveCard.model_validate(card_dict)
+                await context.send(card)
+                return
+
+            # No filters: send full dashboard card WITH filter controls
             categories = await django_client.get_categories()
             years = await django_client.get_available_years()
 

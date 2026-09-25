@@ -260,6 +260,144 @@ def get_receipt_dashboard_card(
     }
 
 
+def get_filtered_results_card(
+    receipts: List[Dict[str, Any]],
+    page: int = 1,
+    has_next: bool = False,
+    status: Optional[str] = None,
+    category: Optional[str] = None,
+    year: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    amount_min: Optional[str] = None,
+    amount_max: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Generate filtered results card with receipts and pagination, NO filter controls.
+
+    Used after filters have been applied to show only the matching results.
+    Does NOT include filter input fields or Apply/Clear Filters buttons.
+    Includes pagination if needed.
+    """
+    body = [
+        {
+            "type": "TextBlock",
+            "text": "Filtered Results",
+            "weight": "bolder",
+            "size": "large",
+        },
+        {
+            "type": "TextBlock",
+            "text": f"Page {page}",
+            "size": "small",
+            "isSubtle": True,
+            "spacing": "none",
+        }
+    ]
+
+    if not receipts:
+        body.append({
+            "type": "TextBlock",
+            "text": "No receipts found matching your filters",
+            "isSubtle": True,
+            "spacing": "medium",
+        })
+    else:
+        for receipt in receipts:
+            details = []
+            if receipt.get("vendor_name"):
+                details.append(f"**Vendor:** {receipt['vendor_name']}")
+            if receipt.get("transaction_date"):
+                details.append(f"**Date:** {receipt['transaction_date']}")
+            if receipt.get("total_amount"):
+                amt = receipt['total_amount']
+                cur = receipt.get('currency', '')
+                details.append(f"**Amount:** {amt} {cur}".strip())
+            if receipt.get("status"):
+                details.append(f"**Status:** {receipt['status']}")
+
+            body.append({
+                "type": "TextBlock",
+                "text": f"📄 {receipt.get('original_filename', 'Unknown')}",
+                "wrap": True,
+                "size": "small",
+                "weight": "bolder",
+                "spacing": "medium",
+            })
+
+            if details:
+                body.append({
+                    "type": "TextBlock",
+                    "text": "\n".join(details),
+                    "wrap": True,
+                    "size": "small",
+                    "spacing": "none",
+                })
+
+            body.append({
+                "type": "ActionSet",
+                "actions": [
+                    {
+                        "type": "Action.Submit",
+                        "title": "View Receipt",
+                        "data": {
+                            "action": "open_receipt",
+                            "receipt_id": receipt["id"],
+                        }
+                    }
+                ]
+            })
+
+    # Add pagination without filter inputs
+    pagination_actions = []
+    if page > 1:
+        pagination_actions.append({
+            "type": "Action.Submit",
+            "title": "← Previous",
+            "data": {
+                "action": "dashboard_previous",
+                "page": page - 1,
+                "filter_status": status or "",
+                "filter_category": category or "",
+                "filter_year": year or "",
+                "filter_date_from": date_from or "",
+                "filter_date_to": date_to or "",
+                "filter_amount_min": amount_min or "",
+                "filter_amount_max": amount_max or "",
+            }
+        })
+
+    if has_next:
+        pagination_actions.append({
+            "type": "Action.Submit",
+            "title": "Next →",
+            "data": {
+                "action": "dashboard_next",
+                "page": page + 1,
+                "filter_status": status or "",
+                "filter_category": category or "",
+                "filter_year": year or "",
+                "filter_date_from": date_from or "",
+                "filter_date_to": date_to or "",
+                "filter_amount_min": amount_min or "",
+                "filter_amount_max": amount_max or "",
+            }
+        })
+
+    if pagination_actions:
+        body.append({
+            "type": "ActionSet",
+            "actions": pagination_actions,
+            "spacing": "medium"
+        })
+
+    return {
+        "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+        "type": "AdaptiveCard",
+        "version": "1.4",
+        "body": body,
+    }
+
+
 def get_receipt_list_card(
     receipts: List[Dict[str, Any]],
     page: int = 1,
