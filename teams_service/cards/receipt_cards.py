@@ -27,6 +27,7 @@ def get_receipt_dashboard_card(
     years: List[int],
     page: int = 1,
     has_next: bool = False,
+    activity_id: Optional[str] = None,
     status: Optional[str] = None,
     category: Optional[str] = None,
     year: Optional[str] = None,
@@ -124,6 +125,7 @@ def get_receipt_dashboard_card(
                     "title": "Apply Filters",
                     "data": {
                         "action": "apply_filters",
+                        "activity_id": activity_id,
                     }
                 },
                 {
@@ -131,6 +133,7 @@ def get_receipt_dashboard_card(
                     "title": "Clear Filters",
                     "data": {
                         "action": "clear_filters",
+                        "activity_id": activity_id,
                     }
                 }
             ],
@@ -213,6 +216,7 @@ def get_receipt_dashboard_card(
             "data": {
                 "action": "dashboard_previous",
                 "page": page - 1,
+                "activity_id": activity_id,
                 "filter_status": status or "",
                 "filter_category": category or "",
                 "filter_year": year or "",
@@ -230,6 +234,7 @@ def get_receipt_dashboard_card(
             "data": {
                 "action": "dashboard_next",
                 "page": page + 1,
+                "activity_id": activity_id,
                 "filter_status": status or "",
                 "filter_category": category or "",
                 "filter_year": year or "",

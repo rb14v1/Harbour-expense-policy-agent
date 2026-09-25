@@ -240,75 +240,75 @@ class ReceiptService:
 
         category_keywords = {
             'Accommodation/Hotel': {
-                'keywords': ['hotel', 'motel', 'resort', 'airbnb', 'lodging', 'inn', 'accommodation'],
+                'keywords': ['hotel', 'motel', 'resort', 'airbnb', 'lodging', 'inn', 'accommodation', 'holiday inn', 'marriott', 'hilton', 'hyatt', 'sheraton', 'westin', 'best western', 'ritz', 'radisson', 'novotel', 'accor', 'ihg'],
                 'confidence_boost': 0.95
             },
             'Transport: Flights': {
-                'keywords': ['airline', 'flight', 'aircraft', 'airfare', 'aviation'],
+                'keywords': ['airline', 'flight', 'aircraft', 'airfare', 'aviation', 'united', 'american', 'delta', 'southwest', 'virgin', 'lufthansa', 'british airways', 'qantas', 'air france', 'icelandair'],
                 'confidence_boost': 0.90
             },
             'Transport: Luas/Bus/Train': {
-                'keywords': ['train', 'railway', 'luas', 'bus', 'transit', 'metro'],
+                'keywords': ['train', 'railway', 'luas', 'bus', 'transit', 'metro', 'amtrak', 'greyhound', 'rail', 'transport', 'eurostar'],
                 'confidence_boost': 0.85
             },
             'Transport: Taxis/Cab/Uber': {
-                'keywords': ['taxi', 'uber', 'lyft', 'cab', 'ride share'],
+                'keywords': ['taxi', 'uber', 'lyft', 'cab', 'ride share', 'ride-sharing', 'grab', 'ola', 'didi', 'gojek'],
                 'confidence_boost': 0.90
             },
             'Transport: Car Rental & Fuel': {
-                'keywords': ['car rental', 'rental', 'hertz', 'enterprise', 'avis'],
+                'keywords': ['car rental', 'rental', 'hertz', 'enterprise', 'avis', 'budget', 'thrifty', 'alamo', 'europcar', 'fuel', 'gas station', 'petrol'],
                 'confidence_boost': 0.90
             },
             'Software': {
-                'keywords': ['software', 'subscription', 'saas', 'cloud', 'license', 'app store', 'microsoft', 'adobe'],
+                'keywords': ['software', 'subscription', 'saas', 'cloud', 'license', 'app store', 'microsoft', 'adobe', 'google', 'amazon', 'aws', 'azure', 'github', 'slack', 'salesforce', 'dropbox'],
                 'confidence_boost': 0.85
             },
             'Food: Dinner - Max Claim: €/$/AUD 45 / INR700': {
-                'keywords': ['restaurant', 'dinner', 'dinner time'],
+                'keywords': ['restaurant', 'dinner', 'dinner time', 'olive garden', 'applebee', 'cheesecake factory', 'ruth chris', 'morton', 'texas roadhouse', 'red lobster', 'nobu'],
                 'confidence_boost': 0.85
             },
             'Food: Breakfast or Lunch - Max Claim: €/$/AUD 15 / INR700': {
-                'keywords': ['breakfast', 'lunch', 'cafe', 'coffee', 'bistro', 'pizzeria', 'bakery'],
+                'keywords': ['breakfast', 'lunch', 'cafe', 'coffee', 'bistro', 'pizzeria', 'bakery', 'starbucks', 'mcdonald', 'chipotle', 'panera', 'subway', 'taco', 'burger', 'pizza', 'sandwich', 'diner'],
                 'confidence_boost': 0.80
             },
             'Stationery Consumables': {
-                'keywords': ['stationery', 'office supplies', 'paper', 'pen', 'ink', 'supplies'],
+                'keywords': ['stationery', 'office supplies', 'paper', 'pen', 'ink', 'supplies', 'staples', 'office depot', 'officeworks'],
                 'confidence_boost': 0.80
             },
             'Training': {
-                'keywords': ['training', 'course', 'workshop', 'seminar', 'education'],
+                'keywords': ['training', 'course', 'workshop', 'seminar', 'education', 'school', 'university', 'college', 'certification', 'learning'],
                 'confidence_boost': 0.85
             },
             'Phone Bills/Broadband': {
-                'keywords': ['phone', 'mobile', 'broadband', 'internet', 'vodafone', 'telstra', 'telecom'],
+                'keywords': ['phone', 'mobile', 'broadband', 'internet', 'vodafone', 'telstra', 'telecom', 'verizon', 'at&t', 'tmobile', 'comcast', 'spectrum'],
                 'confidence_boost': 0.85
             },
             'Bank Charges': {
-                'keywords': ['bank', 'banking fee', 'overdraft', 'wire transfer fee'],
+                'keywords': ['bank', 'banking fee', 'overdraft', 'wire transfer fee', 'wells fargo', 'chase', 'bank of america', 'citibank'],
                 'confidence_boost': 0.80
             },
             'Client Entertainment': {
-                'keywords': ['entertainment', 'movie', 'cinema', 'theatre', 'theater', 'bar', 'lounge', 'club'],
+                'keywords': ['entertainment', 'movie', 'cinema', 'theatre', 'theater', 'bar', 'lounge', 'club', 'nightclub', 'concert', 'event', 'show'],
                 'confidence_boost': 0.80
             },
             'Computer Peripherals': {
-                'keywords': ['mouse', 'keyboard', 'monitor', 'laptop', 'computer', 'hardware'],
+                'keywords': ['mouse', 'keyboard', 'monitor', 'laptop', 'computer', 'hardware', 'apple', 'dell', 'lenovo', 'hp', 'device'],
                 'confidence_boost': 0.80
             },
             'Travel Other incl. Parking & Tolls': {
-                'keywords': ['parking', 'toll', 'petrol station', 'gas station'],
+                'keywords': ['parking', 'toll', 'petrol station', 'gas station', 'fuel', 'park'],
                 'confidence_boost': 0.85
             },
             'Print & Postage': {
-                'keywords': ['print', 'postage', 'shipping', 'courier', 'post office'],
+                'keywords': ['print', 'postage', 'shipping', 'courier', 'post office', 'fedex', 'ups', 'dhl'],
                 'confidence_boost': 0.80
             },
             'Prepaid Flights': {
-                'keywords': ['flight booking', 'airline booking', 'ticket booking'],
+                'keywords': ['flight booking', 'airline booking', 'ticket booking', 'expedia', 'kayak', 'booking'],
                 'confidence_boost': 0.85
             },
             'Prepaid Accommodation': {
-                'keywords': ['hotel booking', 'accommodation booking', 'airbnb booking'],
+                'keywords': ['hotel booking', 'accommodation booking', 'airbnb booking', 'booking.com', 'trivago'],
                 'confidence_boost': 0.85
             },
             'Prepaid Car Rental & Fuel': {

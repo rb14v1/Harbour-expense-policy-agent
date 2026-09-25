@@ -139,10 +139,15 @@ def teams_messages_proxy(request):
     The original uploaded files, Finance tab, and Django APIs remain unchanged.
     """
     try:
+        # Forward Authorization header to FastAPI for independent validation
+        authorization = request.META.get("HTTP_AUTHORIZATION", "")
+        headers = {"Authorization": authorization} if authorization else {}
+
         with httpx.Client(timeout=30) as client:
             response = client.post(
                 'http://localhost:8001/api/messages',
                 json=request.data,
+                headers=headers,
             )
 
         return Response(

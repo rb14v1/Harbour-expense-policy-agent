@@ -90,6 +90,47 @@ Server runs on `http://localhost:8000`
 celery -A celery_app worker --loglevel=info
 ```
 
+### 6. Frontend Development (React + Vite)
+
+The web frontend is being migrated from Django templates to React. During development, both can run side-by-side.
+
+#### Start React Development Server
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+React development server runs on `http://localhost:5173`
+
+#### Build React for Production
+
+```bash
+cd frontend
+npm run build
+```
+
+Output goes to `frontend/dist/`
+
+#### Environment Configuration
+
+Copy `frontend/.env.example` to `frontend/.env`:
+
+```bash
+cp frontend/.env.example frontend/.env
+```
+
+During local development, React proxies API calls to Django on `http://localhost:8000`.
+
+#### Current Status
+
+- **Phase 1**: React + Vite foundation complete
+- **Existing Django templates**: Still active at `http://localhost:8000`
+- **React pages**: Available at `http://localhost:5173/upload` and `http://localhost:5173/finance` (placeholder UI only)
+- **Teams bot**: Unchanged; still uses Adaptive Cards
+- **Backend APIs**: Unchanged; serve both Django and React frontends
+
 ## API Endpoints
 
 ### Upload Receipt

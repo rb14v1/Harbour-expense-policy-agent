@@ -669,3 +669,321 @@ class DjangoClientConfigTests(IsolatedAsyncioTestCase):
         if "ngrok" in preview_url:
             self.assertTrue(preview_url.startswith("https://"),
                           "Preview URL for ngrok should be HTTPS")
+
+
+# Task 3: Dashboard Activity Update Tests
+class DashboardActivityUpdateTests(IsolatedAsyncioTestCase):
+    """Tests for in-place dashboard activity updates."""
+
+    async def test_initial_dashboard_sends_new_message(self):
+        """Test that initial dashboard is sent, then updated with activity_id via bootstrap."""
+        handler = FinanceMessageHandler()
+        context = MagicMock()
+        context.activity.text = "dashboard"
+        context.activity.conversation.id = "conv-123"
+        context.send = AsyncMock()
+        context.api = MagicMock()
+        context.api.conversations.update_activity = AsyncMock()
+
+        # Mock send to return activity with id
+        sent_activity = MagicMock()
+        sent_activity.id = "bootstrap-activity-id"
+        context.send.return_value = sent_activity
+
+        with patch('teams_service.handlers.message_handlers.django_client') as mock_client:
+            mock_client.get_receipts = AsyncMock(return_value={
+                "count": 0,
+                "results": [],
+                "next": None,
+                "previous": None,
+            })
+            mock_client.get_categories = AsyncMock(return_value=[])
+            mock_client.get_available_years = AsyncMock(return_value=[])
+
+            await handler.handle_dashboard_request(context)
+
+            # Initial dashboard should:
+            # 1. Call context.send() once
+            context.send.assert_called_once()
+            # 2. Call update_activity() once for bootstrap
+            context.api.conversations.update_activity.assert_called_once()
+            # Verify bootstrap updated with captured activity ID
+            update_call = context.api.conversations.update_activity.call_args
+            self.assertEqual(update_call.kwargs["activity_id"], "bootstrap-activity-id")
+
+    async def test_apply_filters_uses_activity_id_for_update(self):
+        """Test that apply filters action uses activity_id from payload to update dashboard."""
+        handler = FinanceMessageHandler()
+        context = MagicMock()
+        context.activity.conversation.id = "conv-123"
+        context.send = AsyncMock()
+        context.api = MagicMock()
+        context.api.conversations.update_activity = AsyncMock()
+
+        value = {
+            "activity_id": "activity-456",  # Activity ID from bootstrap card
+            "filter_status": "NEEDS_REVIEW",
+            "filter_category": "",
+            "filter_year": "",
+            "filter_date_from": "",
+            "filter_date_to": "",
+            "filter_amount_min": "",
+            "filter_amount_max": "",
+        }
+
+        with patch('teams_service.handlers.message_handlers.django_client') as mock_client:
+            mock_client.get_receipts = AsyncMock(return_value={
+                "count": 0,
+                "results": [],
+                "next": None,
+                "previous": None,
+            })
+            mock_client.get_categories = AsyncMock(return_value=[])
+            mock_client.get_available_years = AsyncMock(return_value=[])
+
+            await handler.handle_apply_filters(context, value)
+
+            # Should use update_activity with the activity_id from payload
+            context.api.conversations.update_activity.assert_called_once()
+            call_args = context.api.conversations.update_activity.call_args
+            self.assertEqual(call_args.kwargs["conversation_id"], "conv-123")
+            self.assertEqual(call_args.kwargs["activity_id"], "activity-456")
+
+    async def test_clear_filters_updates_existing_activity(self):
+        """Test that clear filters action with activity_id updates the dashboard."""
+        handler = FinanceMessageHandler()
+        context = MagicMock()
+        context.activity.conversation.id = "conv-123"
+        context.send = AsyncMock()
+        context.api = MagicMock()
+        context.api.conversations.update_activity = AsyncMock()
+
+        value = {
+            "action": "clear_filters",
+            "activity_id": "activity-789",  # Activity ID from bootstrap
+        }
+
+        with patch('teams_service.handlers.message_handlers.django_client') as mock_client:
+            mock_client.get_receipts = AsyncMock(return_value={
+                "count": 0,
+                "results": [],
+                "next": None,
+                "previous": None,
+            })
+            mock_client.get_categories = AsyncMock(return_value=[])
+            mock_client.get_available_years = AsyncMock(return_value=[])
+
+            # Simulate the action by calling handle_dashboard_request directly with activity_id
+            await handler.handle_dashboard_request(context, dashboard_activity_id="activity-789")
+
+            # Should use update_activity to update the dashboard
+            context.api.conversations.update_activity.assert_called_once()
+            call_args = context.api.conversations.update_activity.call_args
+            self.assertEqual(call_args.kwargs["activity_id"], "activity-789")
+
+    async def test_pagination_action_passes_activity_id(self):
+        """Test that pagination actions with activity_id update the dashboard."""
+        handler = FinanceMessageHandler()
+        context = MagicMock()
+        context.activity.conversation.id = "conv-123"
+        context.send = AsyncMock()
+        context.api = MagicMock()
+        context.api.conversations.update_activity = AsyncMock()
+
+        # Simulate a dashboard_next action
+        value = {
+            "page": 2,
+            "filter_status": "",
+            "filter_category": "",
+            "filter_year": "",
+            "filter_date_from": "",
+            "filter_date_to": "",
+            "filter_amount_min": "",
+            "filter_amount_max": "",
+        }
+
+        with patch('teams_service.handlers.message_handlers.django_client') as mock_client:
+            mock_client.get_receipts = AsyncMock(return_value={
+                "count": 10,
+                "results": [],
+                "next": None,
+                "previous": 1,
+            })
+            mock_client.get_categories = AsyncMock(return_value=[])
+            mock_client.get_available_years = AsyncMock(return_value=[])
+
+            # Call the pagination handler (simulated through handle_dashboard_request)
+            await handler.handle_dashboard_request(
+                context,
+                page=2,
+                dashboard_activity_id="activity-999"
+            )
+
+            # Should use update_activity instead of send
+            context.api.conversations.update_activity.assert_called_once()
+            context.send.assert_not_called()
+
+
+
+
+class DashboardBootstrapTests(IsolatedAsyncioTestCase):
+    """Tests for dashboard activity ID bootstrap mechanism."""
+
+    async def test_initial_dashboard_sends_then_updates_with_activity_id(self):
+        """Test that initial dashboard is sent, then updated with activity_id embedded."""
+        handler = FinanceMessageHandler()
+        context = MagicMock()
+        context.activity.conversation.id = "conv-123"
+        context.send = AsyncMock()
+        context.api = MagicMock()
+        context.api.conversations.update_activity = AsyncMock()
+
+        # Mock the send response to return a SentActivity-like object with an id
+        sent_activity = MagicMock()
+        sent_activity.id = "dash-activity-456"
+        context.send.return_value = sent_activity
+
+        with patch('teams_service.handlers.message_handlers.django_client') as mock_client:
+            mock_client.get_receipts = AsyncMock(return_value={
+                "count": 2,
+                "results": [
+                    {"id": "r1", "vendor_name": "V1", "total_amount": "100.00", "status": "APPROVED"},
+                    {"id": "r2", "vendor_name": "V2", "total_amount": "200.00", "status": "APPROVED"},
+                ],
+                "next": None,
+            })
+            mock_client.get_categories = AsyncMock(return_value=["Travel"])
+            mock_client.get_available_years = AsyncMock(return_value=[2026])
+
+            # Call with no activity_id (initial dashboard)
+            await handler.handle_dashboard_request(context)
+
+            # Verify send was called exactly once (initial send)
+            self.assertEqual(context.send.call_count, 1)
+
+            # Verify update_activity was called once (bootstrap update)
+            context.api.conversations.update_activity.assert_called_once()
+
+            # Verify the update used the captured activity ID
+            update_call = context.api.conversations.update_activity.call_args
+            self.assertEqual(update_call.kwargs["conversation_id"], "conv-123")
+            self.assertEqual(update_call.kwargs["activity_id"], "dash-activity-456")
+
+    async def test_apply_filters_with_activity_id_uses_update_not_send(self):
+        """Test that apply filters with activity_id uses update_activity, not send."""
+        handler = FinanceMessageHandler()
+        context = MagicMock()
+        context.activity.conversation.id = "conv-123"
+        context.send = AsyncMock()
+        context.api = MagicMock()
+        context.api.conversations.update_activity = AsyncMock()
+
+        value = {
+            "activity_id": "dash-activity-existing",
+            "filter_status": "APPROVED",
+            "filter_category": "",
+            "filter_year": "",
+            "filter_date_from": "",
+            "filter_date_to": "",
+            "filter_amount_min": "",
+            "filter_amount_max": "",
+        }
+
+        with patch('teams_service.handlers.message_handlers.django_client') as mock_client:
+            mock_client.get_receipts = AsyncMock(return_value={
+                "count": 1,
+                "results": [{"id": "r1", "vendor_name": "V1", "total_amount": "100.00"}],
+                "next": None,
+            })
+            mock_client.get_categories = AsyncMock(return_value=[])
+            mock_client.get_available_years = AsyncMock(return_value=[])
+
+            await handler.handle_apply_filters(context, value)
+
+            # Should NOT send new message during normal filter apply
+            context.send.assert_not_called()
+
+            # Should update existing activity
+            context.api.conversations.update_activity.assert_called_once()
+            update_call = context.api.conversations.update_activity.call_args
+            self.assertEqual(update_call.kwargs["activity_id"], "dash-activity-existing")
+
+    async def test_apply_filters_without_activity_id_logs_warning(self):
+        """Test that apply filters without activity_id logs a warning."""
+        handler = FinanceMessageHandler()
+        context = MagicMock()
+        context.activity.conversation.id = "conv-123"
+        context.send = AsyncMock()
+        context.api = MagicMock()
+        context.api.conversations.update_activity = AsyncMock()
+
+        value = {
+            # No activity_id
+            "filter_status": "",
+            "filter_category": "",
+            "filter_year": "",
+            "filter_date_from": "",
+            "filter_date_to": "",
+            "filter_amount_min": "",
+            "filter_amount_max": "",
+        }
+
+        with patch('teams_service.handlers.message_handlers.django_client') as mock_client:
+            mock_client.get_receipts = AsyncMock(return_value={"count": 0, "results": [], "next": None})
+            mock_client.get_categories = AsyncMock(return_value=[])
+            mock_client.get_available_years = AsyncMock(return_value=[])
+
+            with patch('teams_service.handlers.message_handlers.logger') as mock_logger:
+                await handler.handle_apply_filters(context, value)
+                # Should log a warning about missing activity_id
+                mock_logger.warning.assert_called()
+
+    async def test_card_builder_includes_activity_id_in_actions(self):
+        """Test that card builder properly includes activity_id in action payloads."""
+        from teams_service.cards.receipt_cards import get_receipt_dashboard_card
+
+        receipts = [{"id": "r1", "vendor_name": "V1", "total_amount": "100.00", "status": "APPROVED"}]
+        categories = ["Travel"]
+        years = [2026]
+
+        # Build card with activity_id
+        card_dict = get_receipt_dashboard_card(
+            receipts,
+            categories=categories,
+            years=years,
+            activity_id="test-dash-activity-id",
+        )
+
+        # Verify action payloads contain activity_id
+        found_activity_id_in_action = False
+        for body_item in card_dict.get("body", []):
+            if body_item.get("type") == "ActionSet" and "actions" in body_item:
+                for action in body_item["actions"]:
+                    if action.get("data", {}).get("action") in ["apply_filters", "clear_filters", "dashboard_next", "dashboard_previous"]:
+                        if action["data"].get("activity_id") == "test-dash-activity-id":
+                            found_activity_id_in_action = True
+
+        self.assertTrue(found_activity_id_in_action, "No action found with activity_id in card")
+
+    async def test_card_builder_without_activity_id_has_none(self):
+        """Test that card builder correctly sets activity_id to None when not provided."""
+        from teams_service.cards.receipt_cards import get_receipt_dashboard_card
+
+        receipts = [{"id": "r1", "vendor_name": "V1", "total_amount": "100.00"}]
+        categories = []
+        years = []
+
+        # Build card without activity_id
+        card_dict = get_receipt_dashboard_card(
+            receipts,
+            categories=categories,
+            years=years,
+            activity_id=None,
+        )
+
+        # Verify that actions have activity_id=None
+        for body_item in card_dict.get("body", []):
+            if body_item.get("type") == "ActionSet" and "actions" in body_item:
+                for action in body_item["actions"]:
+                    if action.get("data", {}).get("action") in ["apply_filters", "clear_filters"]:
+                        self.assertIsNone(action["data"].get("activity_id"))

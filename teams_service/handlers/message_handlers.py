@@ -55,15 +55,27 @@ class FinanceMessageHandler:
             elif action == "apply_filters":
                 await self.handle_apply_filters(context, value)
             elif action == "clear_filters":
-                await self.handle_dashboard_request(context)
+                dashboard_activity_id = value.get("activity_id")
+                if not dashboard_activity_id:
+                    logger.warning("Clear Filters action missing activity_id in payload. Dashboard may not update in-place.")
+                logger.debug(f"Clearing filters, activity_id={dashboard_activity_id}")
+                await self.handle_dashboard_request(context, dashboard_activity_id=dashboard_activity_id)
             elif action == "dashboard_next":
                 page = value.get("page", 1)
+                dashboard_activity_id = value.get("activity_id")
+                if not dashboard_activity_id:
+                    logger.warning("Next page action missing activity_id in payload. Dashboard may not update in-place.")
                 filters = self._extract_filters_from_value(value)
-                await self.handle_dashboard_request(context, page=page, **filters)
+                logger.debug(f"Paginating to page {page}, activity_id={dashboard_activity_id}")
+                await self.handle_dashboard_request(context, page=page, dashboard_activity_id=dashboard_activity_id, **filters)
             elif action == "dashboard_previous":
                 page = value.get("page", 1)
+                dashboard_activity_id = value.get("activity_id")
+                if not dashboard_activity_id:
+                    logger.warning("Previous page action missing activity_id in payload. Dashboard may not update in-place.")
                 filters = self._extract_filters_from_value(value)
-                await self.handle_dashboard_request(context, page=page, **filters)
+                logger.debug(f"Paginating to page {page}, activity_id={dashboard_activity_id}")
+                await self.handle_dashboard_request(context, page=page, dashboard_activity_id=dashboard_activity_id, **filters)
             else:
                 logger.warning(f"Unknown action: {action}")
                 card_dict = get_error_card(f"Unknown action: {action}")
@@ -248,8 +260,15 @@ class FinanceMessageHandler:
         date_to: Optional[str] = None,
         amount_min: Optional[str] = None,
         amount_max: Optional[str] = None,
+        dashboard_activity_id: Optional[str] = None,
     ) -> None:
-        """Handle request to display Finance Dashboard with all receipts and filters."""
+        """Handle request to display Finance Dashboard with all receipts and filters.
+
+        Bootstrap mechanism:
+        - First call (dashboard_activity_id=None): sends initial card, then immediately
+          updates it with activity_id embedded in action payloads (so future actions can update).
+        - Subsequent calls (dashboard_activity_id provided): updates existing activity.
+        """
         try:
             date_from_api = None
             date_to_api = None
@@ -276,12 +295,14 @@ class FinanceMessageHandler:
             categories = await django_client.get_categories()
             years = await django_client.get_available_years()
 
+            # Build card with activity_id if we have one
             card_dict = get_receipt_dashboard_card(
                 receipts,
                 categories=categories,
                 years=years,
                 page=page,
                 has_next=has_next,
+                activity_id=dashboard_activity_id,
                 status=status,
                 category=category,
                 year=year,
@@ -292,15 +313,107 @@ class FinanceMessageHandler:
             )
             card = AdaptiveCard.model_validate(card_dict)
 
-            await context.send(card)
+            if dashboard_activity_id:
+                # Update existing dashboard activity with filtered/paginated results
+                await self._update_dashboard_activity(context, dashboard_activity_id, card)
+            else:
+                # Initial dashboard: send it, capture ID, then immediately update with ID in actions
+                sent_activity = await context.send(card)
+                captured_activity_id = sent_activity.id
+                logger.debug(f"Initial dashboard sent with activity ID: {captured_activity_id}")
+
+                # Rebuild card with the captured activity_id in action payloads
+                card_dict = get_receipt_dashboard_card(
+                    receipts,
+                    categories=categories,
+                    years=years,
+                    page=page,
+                    has_next=has_next,
+                    activity_id=captured_activity_id,
+                    status=status,
+                    category=category,
+                    year=year,
+                    date_from=date_from,
+                    date_to=date_to,
+                    amount_min=amount_min,
+                    amount_max=amount_max,
+                )
+                card = AdaptiveCard.model_validate(card_dict)
+
+                # Update the same activity with the card that now contains activity_id
+                try:
+                    await self._update_dashboard_activity(context, captured_activity_id, card)
+                    logger.debug(f"Dashboard bootstrapped with activity_id in action payloads")
+                except Exception as bootstrap_error:
+                    logger.error(f"Failed to bootstrap dashboard with activity_id: {bootstrap_error}")
+                    # Dashboard is already visible (from initial send), so just log the error
+                    # Future filter actions won't be able to update, but card is still functional
+
         except Exception as e:
             logger.error(f"Error displaying dashboard: {e}")
             card_dict = get_error_card("Could not load Finance Dashboard. Please try again later.")
             card = AdaptiveCard.model_validate(card_dict)
-            await context.send(card)
+
+            # Only send error if not updating (initial dashboard)
+            if not dashboard_activity_id:
+                await context.send(card)
+            else:
+                # If update fails when updating, try to update error card; if that fails, send new
+                try:
+                    await self._update_dashboard_activity(context, dashboard_activity_id, card)
+                except Exception as fallback_error:
+                    logger.error(f"Failed to update dashboard on error: {fallback_error}")
+                    await context.send(card)
+
+    async def _update_dashboard_activity(
+        self,
+        context: ActivityContext,
+        dashboard_activity_id: str,
+        card: AdaptiveCard,
+    ) -> None:
+        """Update an existing dashboard activity in-place using the Teams API.
+
+        This prevents creating duplicate dashboard messages when filters change.
+        """
+        from microsoft_teams.api import MessageActivityInput
+
+        conversation_id = context.activity.conversation.id
+
+        # Convert AdaptiveCard to MessageActivityInput
+        activity_input = MessageActivityInput(
+            id=dashboard_activity_id,
+            type="message",
+            text="Finance Dashboard",
+            attachments=[{
+                "contentType": "application/vnd.microsoft.card.adaptive",
+                "content": card.model_dump(exclude_unset=True),
+            }]
+        )
+
+        await context.api.conversations.update_activity(
+            conversation_id=conversation_id,
+            activity_id=dashboard_activity_id,
+            activity=activity_input,
+        )
+
+        logger.debug(f"Updated dashboard activity {dashboard_activity_id} in conversation {conversation_id}")
 
     async def handle_apply_filters(self, context: ActivityContext, value: Dict[str, Any]) -> None:
-        """Handle apply filters action from dashboard."""
+        """Handle apply filters action from dashboard.
+
+        Updates the existing dashboard activity instead of sending a new message.
+        The activity_id is embedded in the action payload by the dashboard card bootstrap.
+        """
+        dashboard_activity_id = value.get("activity_id")
+
+        if not dashboard_activity_id:
+            # Activity ID should be in the bootstrap card's action payloads
+            logger.warning(
+                "Apply Filters action missing activity_id in payload. "
+                "This indicates the dashboard card was not properly bootstrapped. "
+                "Dashboard will fall back to normal update behavior."
+            )
+
         status = (value.get("filter_status") or "").strip()
         category = (value.get("filter_category") or "").strip()
         year = (value.get("filter_year") or "").strip()
@@ -308,6 +421,8 @@ class FinanceMessageHandler:
         date_to = (value.get("filter_date_to") or "").strip()
         amount_min = (value.get("filter_amount_min") or "").strip()
         amount_max = (value.get("filter_amount_max") or "").strip()
+
+        logger.debug(f"Applying filters: status={status}, category={category}, year={year}, activity_id={dashboard_activity_id}")
 
         await self.handle_dashboard_request(
             context,
@@ -319,6 +434,7 @@ class FinanceMessageHandler:
             date_to=date_to if date_to else None,
             amount_min=amount_min if amount_min else None,
             amount_max=amount_max if amount_max else None,
+            dashboard_activity_id=dashboard_activity_id,
         )
 
     @staticmethod
