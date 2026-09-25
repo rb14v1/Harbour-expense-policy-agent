@@ -204,9 +204,9 @@ class ReceiptViewSet(viewsets.ReadOnlyModelViewSet):
         response = FileResponse(
             iter([file_bytes]),
             content_type=preview_receipt.mime_type,
-            as_attachment=False
+            as_attachment=True
         )
-        response['Content-Disposition'] = f'inline; filename="{preview_receipt.original_filename}"'
+        response['Content-Disposition'] = f'attachment; filename="{preview_receipt.original_filename}"'
         return response
 
     @action(detail=False, methods=['get'])

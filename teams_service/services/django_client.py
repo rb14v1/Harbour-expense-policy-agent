@@ -135,8 +135,9 @@ class DjangoReceiptClient:
         Get preview/download URL for receipt file.
 
         Returns secure Django-served URL, not direct Blob access.
+        Uses public URL for Teams mobile and external clients.
         """
-        return f"{config.DJANGO_API_URL}/receipts/{receipt_id}/preview/"
+        return f"{config.DJANGO_PUBLIC_API_URL}/receipts/{receipt_id}/preview/"
 
 
 class DjangoReceiptException(Exception):

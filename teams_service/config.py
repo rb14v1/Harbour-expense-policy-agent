@@ -21,6 +21,9 @@ class Config:
 
     # Django Backend
     DJANGO_API_URL: str = os.getenv("DJANGO_API_URL", "http://localhost:8000/api/v1")
+    DJANGO_PUBLIC_API_URL: str = os.getenv(
+        "DJANGO_PUBLIC_API_URL", "http://localhost:8000/api/v1"
+    )
     DJANGO_FINANCE_API_URL: str = os.getenv(
         "DJANGO_FINANCE_API_URL", "http://localhost:8000/finance/api"
     )

@@ -614,3 +614,58 @@ class DecisionLockingTests(IsolatedAsyncioTestCase):
             call_args = context.send.call_args
             card = call_args[0][0]
             self.assertIsNotNone(card)
+
+
+# Test for DjangoReceiptClient preview URL configuration
+class DjangoClientConfigTests(IsolatedAsyncioTestCase):
+    """Tests for DjangoReceiptClient configuration and URL generation."""
+
+    async def test_get_receipt_preview_url_uses_public_api_url(self):
+        """Test that get_receipt_preview_url() uses DJANGO_PUBLIC_API_URL, not DJANGO_API_URL."""
+        from teams_service.services.django_client import DjangoReceiptClient
+        from teams_service.config import config
+
+        client = DjangoReceiptClient()
+        receipt_id = "test-receipt-123"
+
+        # Call the method
+        preview_url = await client.get_receipt_preview_url(receipt_id)
+
+        # Verify it uses DJANGO_PUBLIC_API_URL
+        expected_url = f"{config.DJANGO_PUBLIC_API_URL}/receipts/{receipt_id}/preview/"
+        self.assertEqual(preview_url, expected_url)
+
+        # Verify it does NOT contain DJANGO_API_URL (localhost) when DJANGO_PUBLIC_API_URL is set
+        self.assertNotIn("localhost", preview_url) if "localhost" not in config.DJANGO_PUBLIC_API_URL else None
+
+    async def test_get_receipt_preview_url_includes_receipt_id(self):
+        """Test that get_receipt_preview_url() correctly includes receipt ID."""
+        from teams_service.services.django_client import DjangoReceiptClient
+
+        client = DjangoReceiptClient()
+        receipt_id = "abc-123-def-456"
+
+        preview_url = await client.get_receipt_preview_url(receipt_id)
+
+        # Verify receipt ID is in the URL
+        self.assertIn(receipt_id, preview_url)
+        self.assertIn("/preview/", preview_url)
+
+    async def test_get_receipt_preview_url_is_https_for_ngrok(self):
+        """Test that preview URL uses HTTPS when DJANGO_PUBLIC_API_URL is a public domain."""
+        from teams_service.services.django_client import DjangoReceiptClient
+        from teams_service.config import config
+        import os
+
+        # Verify the configured public URL starts with https for production
+        if "ngrok" in config.DJANGO_PUBLIC_API_URL:
+            self.assertTrue(config.DJANGO_PUBLIC_API_URL.startswith("https://"),
+                          "Production DJANGO_PUBLIC_API_URL should use HTTPS for ngrok")
+
+        client = DjangoReceiptClient()
+        preview_url = await client.get_receipt_preview_url("test-id")
+
+        # If it's an ngrok URL, it must be HTTPS
+        if "ngrok" in preview_url:
+            self.assertTrue(preview_url.startswith("https://"),
+                          "Preview URL for ngrok should be HTTPS")

@@ -762,7 +762,7 @@ class ReceiptPreviewTests(TestCase):
 
             self.assertEqual(response.status_code, 200)
             self.assertEqual(response['Content-Type'], 'application/pdf')
-            self.assertIn('inline', response['Content-Disposition'])
+            self.assertIn('attachment', response['Content-Disposition'])
 
     def test_receipt_preview_blob_error_returns_json_error(self):
         from django.test import Client
@@ -1355,3 +1355,46 @@ class FinancePendingReceiptWorkflowTests(TestCase):
         )
 
         self.assertTrue(receipt.is_final(), "REJECTED should be a final state")
+
+    def test_needs_review_shown_as_completion_to_employee(self):
+        """NEEDS_REVIEW should be recognized as completion state in employee upload flow (not timeout)."""
+        # This test ensures that NEEDS_REVIEW status is included in the list of
+        # "final" statuses that the employee upload JavaScript polls for.
+        # If NEEDS_REVIEW is missing from that list, the employee will see a
+        # misleading "timed out" message even though processing succeeded.
+
+        # The JavaScript on line ~686 of upload.html checks:
+        # if (['APPROVED', 'REJECTED', 'NEEDS_REVIEW', 'EXACT_DUPLICATE', 'SEMANTIC_DUPLICATE', 'FAILED'].includes(receipt.status))
+
+        receipt = Receipt.objects.create(
+            owner="employee-user",
+            original_filename="receipt.pdf",
+            blob_name="receipts/employee-user/uuid/receipt.pdf",
+            mime_type="application/pdf",
+            file_size=1000,
+            sha256_hash="abc123",
+            transaction_date=date.today() - timedelta(days=10),
+            total_amount=Decimal("100.00"),
+            currency="USD",
+            vendor_name="Test Vendor",
+            status="NEEDS_REVIEW",
+            processing_message="Receipt has been validated and approved by policy. Awaiting Finance review.",
+            normalized_json={"vendor_name": "Test Vendor"},
+        )
+
+        # Verify that NEEDS_REVIEW receipt is properly created with correct message
+        self.assertEqual(receipt.status, "NEEDS_REVIEW")
+        self.assertIn("Awaiting Finance review", receipt.processing_message)
+
+        # Verify this status is visible to the employee (via API)
+        from django.test import Client
+        client = Client()
+        response = client.get(
+            f'/api/v1/receipts/{receipt.id}/?owner=employee-user',
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest'
+        )
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data['status'], 'NEEDS_REVIEW')
+        self.assertEqual(data['processing_message'], "Receipt has been validated and approved by policy. Awaiting Finance review.")

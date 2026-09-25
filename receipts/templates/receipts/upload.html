@@ -683,7 +683,7 @@
                         if (response.ok) {
                             const receipt = await response.json();
 
-                            if (['APPROVED', 'REJECTED', 'EXACT_DUPLICATE', 'SEMANTIC_DUPLICATE', 'FAILED'].includes(receipt.status)) {
+                            if (['APPROVED', 'REJECTED', 'NEEDS_REVIEW', 'EXACT_DUPLICATE', 'SEMANTIC_DUPLICATE', 'FAILED'].includes(receipt.status)) {
                                 await handleReceiptResult(receipt, fileName, processingMsgId);
                                 resolve();
                             } else {
@@ -692,7 +692,7 @@
                                     setTimeout(poll, 1000);
                                 } else {
                                     removeProcessingMessage(processingMsgId);
-                                    appendMessage('assistant', `⏱️ Processing of ${escapeHtml(fileName)} timed out. Please refresh and try again.`);
+                                    appendMessage('assistant', `⏳ Receipt processing is taking longer than expected. Please refresh to check the status.`);
                                     resolve();
                                 }
                             }
@@ -813,6 +813,9 @@
             } else if (receipt.status === 'REJECTED') {
                 statusClass = 'rejected';
                 statusText = '❌ REJECTED';
+            } else if (receipt.status === 'NEEDS_REVIEW') {
+                statusClass = 'processing';
+                statusText = '⏳ PENDING FINANCE REVIEW';
             } else if (receipt.status === 'EXACT_DUPLICATE') {
                 statusClass = 'duplicate';
                 statusText = '⚠️ EXACT DUPLICATE';
