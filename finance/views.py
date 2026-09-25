@@ -16,6 +16,12 @@ def finance_dashboard(request):
 
 
 @api_view(['GET'])
+def finance_categories_list(request):
+    categories = [choice[0] for choice in Receipt.CATEGORY_CHOICES]
+    return Response({'categories': categories})
+
+
+@api_view(['GET'])
 def finance_receipts_list(request):
     queryset = Receipt.objects.all().order_by('-created_at')
 

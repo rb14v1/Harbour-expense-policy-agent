@@ -4,7 +4,7 @@ Teams Message Handlers
 Handles Teams bot messages and invocations for Finance receipt review.
 """
 import logging
-from typing import Optional, Any
+from typing import Optional, Any, Dict
 from microsoft_teams.apps.routing.activity_context import ActivityContext
 from microsoft_teams.cards import AdaptiveCard
 from teams_service.services.django_client import django_client
@@ -13,6 +13,7 @@ from teams_service.cards.receipt_cards import (
     get_receipt_detail_card,
     get_decision_confirmation_card,
     get_error_card,
+    get_receipt_dashboard_card,
 )
 
 logger = logging.getLogger(__name__)
@@ -51,6 +52,18 @@ class FinanceMessageHandler:
                 await self.handle_receipt_action(context, receipt_id, "reject", rejection_reason)
             elif action == "preview_receipt":
                 await self.handle_preview_action(context, receipt_id)
+            elif action == "apply_filters":
+                await self.handle_apply_filters(context, value)
+            elif action == "clear_filters":
+                await self.handle_dashboard_request(context)
+            elif action == "dashboard_next":
+                page = value.get("page", 1)
+                filters = self._extract_filters_from_value(value)
+                await self.handle_dashboard_request(context, page=page, **filters)
+            elif action == "dashboard_previous":
+                page = value.get("page", 1)
+                filters = self._extract_filters_from_value(value)
+                await self.handle_dashboard_request(context, page=page, **filters)
             else:
                 logger.warning(f"Unknown action: {action}")
                 card_dict = get_error_card(f"Unknown action: {action}")
@@ -59,7 +72,9 @@ class FinanceMessageHandler:
             return
 
         # Text-based message routing
-        if "list" in message_text or "receipts" in message_text or message_text == "" or message_text == "hi" or message_text == "hello":
+        if "dashboard" in message_text:
+            await self.handle_dashboard_request(context)
+        elif "list" in message_text or "receipts" in message_text or message_text == "" or message_text == "hi" or message_text == "hello":
             await self.handle_list_receipts(context)
         elif "detail" in message_text or "open" in message_text:
             await self.handle_open_receipt(context)
@@ -221,6 +236,103 @@ class FinanceMessageHandler:
             card_dict = get_error_card(f"Could not load preview for receipt {receipt_id}.")
             card = AdaptiveCard.model_validate(card_dict)
             await context.send(card)
+
+    async def handle_dashboard_request(
+        self,
+        context: ActivityContext,
+        page: int = 1,
+        status: Optional[str] = None,
+        category: Optional[str] = None,
+        year: Optional[str] = None,
+        date_from: Optional[str] = None,
+        date_to: Optional[str] = None,
+        amount_min: Optional[str] = None,
+        amount_max: Optional[str] = None,
+    ) -> None:
+        """Handle request to display Finance Dashboard with all receipts and filters."""
+        try:
+            date_from_api = None
+            date_to_api = None
+            if year and year != "":
+                date_from_api = f"{year}-01-01"
+                date_to_api = f"{year}-12-31"
+            elif date_from or date_to:
+                date_from_api = date_from
+                date_to_api = date_to
+
+            response = await django_client.get_receipts(
+                status=status if status else None,
+                category=category if category else None,
+                date_from=date_from_api,
+                date_to=date_to_api,
+                amount_min=amount_min if amount_min else None,
+                amount_max=amount_max if amount_max else None,
+                page=page
+            )
+
+            receipts = response.get("results", [])
+            has_next = response.get("next") is not None
+
+            categories = await django_client.get_categories()
+            years = await django_client.get_available_years()
+
+            card_dict = get_receipt_dashboard_card(
+                receipts,
+                categories=categories,
+                years=years,
+                page=page,
+                has_next=has_next,
+                status=status,
+                category=category,
+                year=year,
+                date_from=date_from,
+                date_to=date_to,
+                amount_min=amount_min,
+                amount_max=amount_max,
+            )
+            card = AdaptiveCard.model_validate(card_dict)
+
+            await context.send(card)
+        except Exception as e:
+            logger.error(f"Error displaying dashboard: {e}")
+            card_dict = get_error_card("Could not load Finance Dashboard. Please try again later.")
+            card = AdaptiveCard.model_validate(card_dict)
+            await context.send(card)
+
+    async def handle_apply_filters(self, context: ActivityContext, value: Dict[str, Any]) -> None:
+        """Handle apply filters action from dashboard."""
+        status = (value.get("filter_status") or "").strip()
+        category = (value.get("filter_category") or "").strip()
+        year = (value.get("filter_year") or "").strip()
+        date_from = (value.get("filter_date_from") or "").strip()
+        date_to = (value.get("filter_date_to") or "").strip()
+        amount_min = (value.get("filter_amount_min") or "").strip()
+        amount_max = (value.get("filter_amount_max") or "").strip()
+
+        await self.handle_dashboard_request(
+            context,
+            page=1,
+            status=status if status else None,
+            category=category if category else None,
+            year=year if year else None,
+            date_from=date_from if date_from else None,
+            date_to=date_to if date_to else None,
+            amount_min=amount_min if amount_min else None,
+            amount_max=amount_max if amount_max else None,
+        )
+
+    @staticmethod
+    def _extract_filters_from_value(value: Dict[str, Any]) -> Dict[str, Any]:
+        """Extract filter parameters from action value."""
+        return {
+            "status": (value.get("filter_status") or "").strip() or None,
+            "category": (value.get("filter_category") or "").strip() or None,
+            "year": (value.get("filter_year") or "").strip() or None,
+            "date_from": (value.get("filter_date_from") or "").strip() or None,
+            "date_to": (value.get("filter_date_to") or "").strip() or None,
+            "amount_min": (value.get("filter_amount_min") or "").strip() or None,
+            "amount_max": (value.get("filter_amount_max") or "").strip() or None,
+        }
 
     @staticmethod
     def _get_welcome_message() -> str:
