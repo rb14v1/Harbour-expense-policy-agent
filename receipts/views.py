@@ -2,7 +2,7 @@ from rest_framework import viewsets, status, parsers
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.shortcuts import render
-from django.http import FileResponse, Http404
+from django.http import FileResponse, Http404, JsonResponse
 from receipts.models import Receipt
 from receipts.serializers import (
     ReceiptDetailSerializer,
@@ -201,12 +201,28 @@ class ReceiptViewSet(viewsets.ReadOnlyModelViewSet):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
-        response = FileResponse(
-            iter([file_bytes]),
-            content_type=preview_receipt.mime_type,
-            as_attachment=True
-        )
-        response['Content-Disposition'] = f'attachment; filename="{preview_receipt.original_filename}"'
+        # Determine Content-Disposition based on file type
+        # PDFs should download (attachment) on mobile
+        # Images should display inline in browser where supported
+        is_pdf = preview_receipt.mime_type and 'pdf' in preview_receipt.mime_type.lower()
+        is_image = preview_receipt.mime_type and preview_receipt.mime_type.lower().startswith('image/')
+
+        if is_pdf:
+            # PDF: force download with attachment disposition for reliable mobile handling
+            safe_filename = preview_receipt.original_filename
+            if not safe_filename.lower().endswith('.pdf'):
+                safe_filename = f"{safe_filename}.pdf"
+            response = FileResponse(iter([file_bytes]), content_type=preview_receipt.mime_type)
+            response['Content-Disposition'] = f'attachment; filename="{safe_filename}"'
+        elif is_image:
+            # Image: display inline in browser for better mobile UX
+            response = FileResponse(iter([file_bytes]), content_type=preview_receipt.mime_type)
+            response['Content-Disposition'] = 'inline'
+        else:
+            # Other types: default to attachment for safety
+            response = FileResponse(iter([file_bytes]), content_type=preview_receipt.mime_type, as_attachment=True)
+            response['Content-Disposition'] = f'attachment; filename="{preview_receipt.original_filename}"'
+
         return response
 
     @action(detail=False, methods=['get'])
@@ -243,6 +259,124 @@ class ReceiptViewSet(viewsets.ReadOnlyModelViewSet):
 
         serializer = ReceiptDetailSerializer(receipt)
         return Response(serializer.data)
+
+
+def download_receipt(request, receipt_id):
+    """
+    Explicit endpoint to download/preview receipt files.
+    Handles both GET and HEAD requests without 301 redirect.
+    Properly supports Teams mobile webview PDF handling.
+    """
+    import logging
+    diag_logger = logging.getLogger('download_receipt_diagnostic')
+
+    owner = request.GET.get('owner', 'default-user')
+
+    diag_logger.info(f"[DOWNLOAD_START] receipt_id={receipt_id}, method={request.method}, owner={owner}, query_params={dict(request.GET)}")
+
+    try:
+        receipt = Receipt.objects.get(id=receipt_id)
+        diag_logger.info(f"[RECEIPT_FOUND] id={receipt.id}, owner={receipt.owner}, status={receipt.status}, blob_name={receipt.blob_name[:50] if receipt.blob_name else 'EMPTY'}, exact_dup={receipt.exact_duplicate_of}, semantic_dup={receipt.semantic_duplicate_of}")
+    except Receipt.DoesNotExist:
+        diag_logger.warning(f"[RECEIPT_NOT_FOUND] receipt_id={receipt_id}")
+        return JsonResponse(
+            {'error': 'Receipt not found'},
+            status=404
+        )
+
+    # Authorization: allow owner or finance-department
+    if owner != 'finance-department' and receipt.owner != owner:
+        diag_logger.warning(f"[UNAUTHORIZED] receipt_owner={receipt.owner}, request_owner={owner}")
+        return JsonResponse(
+            {'error': 'Unauthorized'},
+            status=403
+        )
+
+    preview_receipt = receipt
+
+    # Handle duplicates: find the original file
+    if not receipt.blob_name:
+        diag_logger.info(f"[NO_BLOB_NAME] receipt_status={receipt.status}, checking for duplicates")
+        if receipt.status == 'EXACT_DUPLICATE' and receipt.exact_duplicate_of:
+            original = receipt.exact_duplicate_of
+            diag_logger.info(f"[EXACT_DUPLICATE_FOUND] original_id={original.id}, original_blob={original.blob_name[:50] if original.blob_name else 'EMPTY'}")
+            if owner != 'finance-department' and original.owner != owner:
+                diag_logger.warning(f"[UNAUTHORIZED_DUPLICATE_ORIGINAL] original_owner={original.owner}, request_owner={owner}")
+                return JsonResponse(
+                    {'error': 'Unauthorized'},
+                    status=403
+                )
+            preview_receipt = original
+        elif receipt.status == 'SEMANTIC_DUPLICATE' and receipt.semantic_duplicate_of:
+            original = receipt.semantic_duplicate_of
+            diag_logger.info(f"[SEMANTIC_DUPLICATE_FOUND] original_id={original.id}, original_blob={original.blob_name[:50] if original.blob_name else 'EMPTY'}")
+            if owner != 'finance-department' and original.owner != owner:
+                diag_logger.warning(f"[UNAUTHORIZED_DUPLICATE_ORIGINAL] original_owner={original.owner}, request_owner={owner}")
+                return JsonResponse(
+                    {'error': 'Unauthorized'},
+                    status=403
+                )
+            preview_receipt = original
+        else:
+            diag_logger.error(f"[ERROR_NO_BLOB_NOT_DUPLICATE] receipt_status={receipt.status}, no duplicate references found")
+            return JsonResponse(
+                {'error': 'Unable to download this receipt because the original file is no longer available'},
+                status=404
+            )
+
+    if not preview_receipt.blob_name:
+        diag_logger.error(f"[ERROR_PREVIEW_NO_BLOB] preview_receipt_id={preview_receipt.id}, preview_receipt_status={preview_receipt.status}")
+        return JsonResponse(
+            {'error': 'Unable to download this receipt because the original file is no longer available'},
+            status=404
+        )
+
+    blob_service = BlobService()
+    try:
+        diag_logger.info(f"[BLOB_DOWNLOAD_START] blob_name={preview_receipt.blob_name[:50]}")
+        file_bytes = blob_service.download(preview_receipt.blob_name)
+        diag_logger.info(f"[BLOB_DOWNLOAD_SUCCESS] bytes={len(file_bytes)}")
+    except BlobUploadError as e:
+        diag_logger.error(f"[BLOB_UPLOAD_ERROR] blob_name={preview_receipt.blob_name[:50]}, error={str(e)}")
+        return JsonResponse(
+            {'error': 'Unable to download this receipt because the original file is no longer available'},
+            status=404
+        )
+    except Exception as e:
+        diag_logger.error(f"[BLOB_UNEXPECTED_ERROR] blob_name={preview_receipt.blob_name[:50]}, error_type={type(e).__name__}, error={str(e)}")
+        return JsonResponse(
+            {'error': 'Unable to retrieve the receipt file'},
+            status=500
+        )
+
+    # Determine Content-Disposition and headers based on file type
+    is_pdf = preview_receipt.mime_type and 'pdf' in preview_receipt.mime_type.lower()
+    is_image = preview_receipt.mime_type and preview_receipt.mime_type.lower().startswith('image/')
+
+    if is_pdf:
+        safe_filename = preview_receipt.original_filename
+        if not safe_filename.lower().endswith('.pdf'):
+            safe_filename = f"{safe_filename}.pdf"
+        response = FileResponse(iter([file_bytes]), content_type=preview_receipt.mime_type)
+        response['Content-Disposition'] = f'inline; filename="{safe_filename}"'
+        diag_logger.info(f"[RESPONSE_PDF] filename={safe_filename}")
+    elif is_image:
+        response = FileResponse(iter([file_bytes]), content_type=preview_receipt.mime_type)
+        response['Content-Disposition'] = 'inline'
+        diag_logger.info(f"[RESPONSE_IMAGE] mime_type={preview_receipt.mime_type}")
+    else:
+        response = FileResponse(iter([file_bytes]), content_type=preview_receipt.mime_type, as_attachment=True)
+        response['Content-Disposition'] = f'attachment; filename="{preview_receipt.original_filename}"'
+        diag_logger.info(f"[RESPONSE_OTHER] mime_type={preview_receipt.mime_type}")
+
+    # For HEAD requests, Django automatically strips the body but preserves headers
+    # This ensures Teams mobile gets proper metadata without unnecessary redirect
+    if request.method == 'HEAD':
+        response['Content-Length'] = str(len(file_bytes))
+        diag_logger.info(f"[RESPONSE_HEAD] content_length={len(file_bytes)}")
+
+    diag_logger.info(f"[DOWNLOAD_SUCCESS] receipt_id={receipt_id}, method={request.method}, bytes={len(file_bytes)}")
+    return response
 
 
 def upload_form_view(request):

@@ -215,6 +215,12 @@ class ReceiptService:
         """
         Determine receipt category with confidence score.
 
+        Uses intelligent keyword matching:
+        1. First, matches keywords in merchant_name (highest priority, +0.15 confidence)
+        2. Then, matches keywords in line_items and payment_method
+        3. Returns highest confidence match
+        4. Avoids generic keyword matches when more specific matches exist
+
         Returns dict:
         {
             'category': 'Category Name',
@@ -236,7 +242,6 @@ class ReceiptService:
         line_items = extracted.get('line_items', [])
         line_items_desc = ' '.join([str(item.get('description', '')).lower() for item in line_items])
         payment_method = (extracted.get('payment', {}).get('method') or '').lower()
-        all_text = merchant_name + ' ' + line_items_desc + ' ' + payment_method
 
         category_keywords = {
             'Accommodation/Hotel': {
@@ -304,7 +309,7 @@ class ReceiptService:
                 'confidence_boost': 0.80
             },
             'Prepaid Flights': {
-                'keywords': ['flight booking', 'airline booking', 'ticket booking', 'expedia', 'kayak', 'booking'],
+                'keywords': ['flight booking', 'airline booking', 'ticket booking', 'expedia', 'kayak'],
                 'confidence_boost': 0.85
             },
             'Prepaid Accommodation': {
@@ -320,24 +325,35 @@ class ReceiptService:
         best_match = None
         best_confidence = 0.0
         match_reason = ''
-        all_text_words = all_text.split()
+        match_source = ''
 
         for category, config in category_keywords.items():
-            for keyword in config['keywords']:
+            keywords_sorted = sorted(config['keywords'], key=len, reverse=True)
+
+            for keyword in keywords_sorted:
                 keyword_words = keyword.split()
-                match_found = False
+                match_found_in_merchant = False
+                match_found_in_other = False
 
                 if len(keyword_words) == 1:
-                    match_found = keyword_words[0] in all_text_words
+                    match_found_in_merchant = keyword_words[0] in merchant_name.split()
+                    match_found_in_other = keyword_words[0] in (line_items_desc + ' ' + payment_method).split()
                 else:
-                    match_found = keyword in all_text
+                    match_found_in_merchant = keyword in merchant_name
+                    match_found_in_other = keyword in (line_items_desc + ' ' + payment_method)
 
-                if match_found:
+                if match_found_in_merchant or match_found_in_other:
                     confidence = config['confidence_boost']
+                    if match_found_in_merchant:
+                        confidence = min(1.0, confidence + 0.15)
+                        match_source = 'merchant name'
+                    else:
+                        match_source = 'receipt details'
+
                     if confidence > best_confidence:
                         best_confidence = confidence
                         best_match = category
-                        match_reason = f"Matched keyword '{keyword}' in receipt details"
+                        match_reason = f"Matched '{keyword}' in {match_source}"
                     break
 
         if best_match and best_confidence >= 0.75:

@@ -9,6 +9,7 @@ from receipts.services import (
     PolicyService,
     ReceiptService,
 )
+from receipts.services.document_intelligence_service import DocumentIntelligenceService
 from receipts.exceptions import UnsupportedFileTypeError, ReceiptTooLargeError
 from datetime import datetime, timedelta, date
 from decimal import Decimal
@@ -173,6 +174,153 @@ class NormalizationServiceTests(TestCase):
         }
         normalized = NormalizationService.normalize(extracted)
         self.assertEqual(normalized['currency'], "INR")
+
+    def test_normalize_date_iso_format(self):
+        extracted = {
+            "merchant": {"name": "Test", "address": None, "phone": None},
+            "invoice": {"invoice_number": None, "transaction_date": "2026-09-05"},
+            "amounts": {"subtotal": None, "tax": None, "total": None, "currency": None},
+            "payment": {"method": None},
+            "line_items": [],
+            "extraction": {},
+        }
+        normalized = NormalizationService.normalize(extracted)
+        self.assertEqual(normalized['transaction_date'], "2026-09-05")
+
+    def test_normalize_date_dmy_format(self):
+        extracted = {
+            "merchant": {"name": "Test", "address": None, "phone": None},
+            "invoice": {"invoice_number": None, "transaction_date": "05/09/2026"},
+            "amounts": {"subtotal": None, "tax": None, "total": None, "currency": None},
+            "payment": {"method": None},
+            "line_items": [],
+            "extraction": {},
+        }
+        normalized = NormalizationService.normalize(extracted)
+        self.assertEqual(normalized['transaction_date'], "2026-09-05")
+
+    def test_normalize_date_textual_month_abbrev(self):
+        extracted = {
+            "merchant": {"name": "Test", "address": None, "phone": None},
+            "invoice": {"invoice_number": None, "transaction_date": "5 Sept 2026"},
+            "amounts": {"subtotal": None, "tax": None, "total": None, "currency": None},
+            "payment": {"method": None},
+            "line_items": [],
+            "extraction": {},
+        }
+        normalized = NormalizationService.normalize(extracted)
+        self.assertEqual(normalized['transaction_date'], "2026-09-05")
+
+    def test_normalize_date_textual_month_full(self):
+        extracted = {
+            "merchant": {"name": "Test", "address": None, "phone": None},
+            "invoice": {"invoice_number": None, "transaction_date": "5 September 2026"},
+            "amounts": {"subtotal": None, "tax": None, "total": None, "currency": None},
+            "payment": {"method": None},
+            "line_items": [],
+            "extraction": {},
+        }
+        normalized = NormalizationService.normalize(extracted)
+        self.assertEqual(normalized['transaction_date'], "2026-09-05")
+
+    def test_normalize_date_textual_month_comma_format(self):
+        extracted = {
+            "merchant": {"name": "Test", "address": None, "phone": None},
+            "invoice": {"invoice_number": None, "transaction_date": "September 5, 2026"},
+            "amounts": {"subtotal": None, "tax": None, "total": None, "currency": None},
+            "payment": {"method": None},
+            "line_items": [],
+            "extraction": {},
+        }
+        normalized = NormalizationService.normalize(extracted)
+        self.assertEqual(normalized['transaction_date'], "2026-09-05")
+
+
+class DocumentIntelligenceServiceTests(TestCase):
+    def setUp(self):
+        self.service = DocumentIntelligenceService()
+
+    def test_extract_month_name_date_abbreviated(self):
+        content = "Receipt Date: 5 Sept 2026\nTotal: 100"
+        result = self.service._extract_month_name_date(content)
+        self.assertEqual(result, "2026-09-05")
+
+    def test_extract_month_name_date_full(self):
+        content = "Receipt Date: 5 September 2026\nTotal: 100"
+        result = self.service._extract_month_name_date(content)
+        self.assertEqual(result, "2026-09-05")
+
+    def test_extract_month_name_date_comma_format(self):
+        content = "Receipt Date: September 5, 2026\nTotal: 100"
+        result = self.service._extract_month_name_date(content)
+        self.assertEqual(result, "2026-09-05")
+
+    def test_extract_month_name_date_padded_day(self):
+        content = "Transaction: 05 Sep 2026"
+        result = self.service._extract_month_name_date(content)
+        self.assertEqual(result, "2026-09-05")
+
+    def test_extract_month_name_date_no_match(self):
+        content = "Receipt Date: 2026-09-05\nTotal: 100"
+        result = self.service._extract_month_name_date(content)
+        self.assertIsNone(result)
+
+    def test_extract_month_name_date_all_months_abbreviated(self):
+        months = [
+            ("1 Jan 2026", "2026-01-01"),
+            ("15 Feb 2026", "2026-02-15"),
+            ("3 Mar 2026", "2026-03-03"),
+            ("20 Apr 2026", "2026-04-20"),
+            ("1 May 2026", "2026-05-01"),
+            ("10 Jun 2026", "2026-06-10"),
+            ("4 Jul 2026", "2026-07-04"),
+            ("15 Aug 2026", "2026-08-15"),
+            ("5 Sep 2026", "2026-09-05"),
+            ("31 Oct 2026", "2026-10-31"),
+            ("25 Nov 2026", "2026-11-25"),
+            ("25 Dec 2026", "2026-12-25"),
+        ]
+        for date_text, expected in months:
+            with self.subTest(date_text=date_text):
+                content = f"Date: {date_text}"
+                result = self.service._extract_month_name_date(content)
+                self.assertEqual(result, expected)
+
+    def test_extract_month_name_date_all_months_full(self):
+        months = [
+            ("1 January 2026", "2026-01-01"),
+            ("15 February 2026", "2026-02-15"),
+            ("3 March 2026", "2026-03-03"),
+            ("20 April 2026", "2026-04-20"),
+            ("1 May 2026", "2026-05-01"),
+            ("10 June 2026", "2026-06-10"),
+            ("4 July 2026", "2026-07-04"),
+            ("15 August 2026", "2026-08-15"),
+            ("5 September 2026", "2026-09-05"),
+            ("31 October 2026", "2026-10-31"),
+            ("25 November 2026", "2026-11-25"),
+            ("25 December 2026", "2026-12-25"),
+        ]
+        for date_text, expected in months:
+            with self.subTest(date_text=date_text):
+                content = f"Date: {date_text}"
+                result = self.service._extract_month_name_date(content)
+                self.assertEqual(result, expected)
+
+    def test_extract_from_ocr_text_prefers_month_name_date(self):
+        content = "Receipt Date: 5 Sept 2026\nTotal Amount: 1000.00"
+        result = self.service._extract_from_ocr_text(content)
+        self.assertEqual(result['transaction_date'], "2026-09-05")
+
+    def test_extract_from_ocr_text_fallback_to_iso_when_no_month_name(self):
+        content = "Date: 2026-09-05\nTotal: 100"
+        result = self.service._extract_from_ocr_text(content)
+        self.assertEqual(result['transaction_date'], "2026-09-05")
+
+    def test_extract_from_ocr_text_invoice_number(self):
+        content = "RECEIPT NO: INV-2026-001\nDate: 5 Sept 2026"
+        result = self.service._extract_from_ocr_text(content)
+        self.assertEqual(result['invoice_number'], "INV-2026-001")
 
 
 class DuplicateServiceTests(TestCase):
@@ -1751,3 +1899,284 @@ class ReceiptDownloadEndpointTests(TestCase):
         client = Client()
         response = client.get('/api/v1/receipts/00000000-0000-0000-0000-000000000000/download?owner=default-user')
         self.assertEqual(response.status_code, 404)
+
+
+class RejectionReasonsTests(TestCase):
+    """Test that rejection reasons are human-readable, not generic."""
+
+    def test_receipt_older_than_35_days_shows_actual_age(self):
+        """Receipt older than 35 days should show actual age in rejection reason."""
+        from receipts.serializers import ReceiptStatusSerializer
+
+        old_date = (datetime.now().date() - timedelta(days=45))
+        receipt = Receipt.objects.create(
+            owner="test-user",
+            original_filename="old_receipt.pdf",
+            blob_name="receipts/test/uuid/old.pdf",
+            mime_type="application/pdf",
+            file_size=1000,
+            sha256_hash="old_receipt_hash",
+            status="REJECTED",
+            transaction_date=old_date,
+            processing_message="Receipt is older than 35 days (45 days old).",
+        )
+
+        serializer = ReceiptStatusSerializer(receipt)
+        message = serializer.get_message(receipt)
+
+        self.assertIn("older than 35 days", message.lower())
+        self.assertNotEqual(message, "Receipt rejected by policy.")
+        self.assertIn("45", message)
+
+    def test_blank_receipt_shows_readable_reason(self):
+        """Blank receipt should show human-readable reason."""
+        from receipts.serializers import ReceiptStatusSerializer
+
+        receipt = Receipt.objects.create(
+            owner="test-user",
+            original_filename="blank.pdf",
+            blob_name="receipts/test/uuid/blank.pdf",
+            mime_type="application/pdf",
+            file_size=100,
+            sha256_hash="blank_hash",
+            status="FAILED",
+            processing_message="The uploaded receipt appears to be blank. Please upload a receipt with visible content.",
+        )
+
+        serializer = ReceiptStatusSerializer(receipt)
+        message = serializer.get_message(receipt)
+
+        self.assertIn("blank", message.lower())
+        self.assertIn("visible content", message.lower())
+        self.assertNotEqual(message, "Receipt processing failed.")
+
+    def test_invalid_document_shows_readable_reason(self):
+        """Invalid document should show human-readable reason."""
+        from receipts.serializers import ReceiptStatusSerializer
+
+        receipt = Receipt.objects.create(
+            owner="test-user",
+            original_filename="notreceipt.pdf",
+            blob_name="receipts/test/uuid/notreceipt.pdf",
+            mime_type="application/pdf",
+            file_size=2000,
+            sha256_hash="not_receipt_hash",
+            status="FAILED",
+            processing_message="The uploaded document does not appear to be a valid receipt. A valid receipt must contain a vendor name, total amount, and at least one additional receipt indicator.",
+        )
+
+        serializer = ReceiptStatusSerializer(receipt)
+        message = serializer.get_message(receipt)
+
+        self.assertIn("valid receipt", message.lower())
+        self.assertNotEqual(message, "Receipt processing failed.")
+
+    def test_ocr_failed_shows_actual_error(self):
+        """OCR failure should show actual error reason."""
+        from receipts.serializers import ReceiptStatusSerializer
+
+        receipt = Receipt.objects.create(
+            owner="test-user",
+            original_filename="unreadable.pdf",
+            blob_name="receipts/test/uuid/unreadable.pdf",
+            mime_type="application/pdf",
+            file_size=500,
+            sha256_hash="unreadable_hash",
+            status="OCR_FAILED",
+            processing_message="We couldn't read the receipt. The document may be blurry, unclear, or contain unreadable content.",
+        )
+
+        serializer = ReceiptStatusSerializer(receipt)
+        message = serializer.get_message(receipt)
+
+        self.assertIn("couldn't read", message.lower())
+        self.assertNotEqual(message, "Receipt processing failed.")
+
+    def test_approved_receipt_shows_success_message(self):
+        """Approved receipt should show success message."""
+        from receipts.serializers import ReceiptStatusSerializer
+
+        receipt = Receipt.objects.create(
+            owner="test-user",
+            original_filename="good_receipt.pdf",
+            blob_name="receipts/test/uuid/good.pdf",
+            mime_type="application/pdf",
+            file_size=1500,
+            sha256_hash="good_hash",
+            status="APPROVED",
+            vendor_name="Starbucks",
+            transaction_date=datetime.now().date(),
+            total_amount=Decimal("5.50"),
+        )
+
+        serializer = ReceiptStatusSerializer(receipt)
+        message = serializer.get_message(receipt)
+
+        self.assertIn("approved", message.lower())
+        self.assertNotIn("rejected", message.lower())
+
+
+class CategoryDetectionTests(TestCase):
+    """Test that category detection is reliable and generic across vendors."""
+
+    def test_uber_receipt_classified_as_taxi_not_prepaid_flight(self):
+        """Uber/taxi receipt should be Transport: Taxis/Cab/Uber, not Prepaid Flights."""
+        extracted = {
+            "merchant": {"name": "Uber", "address": None, "phone": None},
+            "invoice": {"invoice_number": "TXN12345", "transaction_date": None},
+            "amounts": {"subtotal": 22.50, "tax": 0.00, "total": 22.50, "currency": "USD"},
+            "payment": {"method": "Credit Card"},
+            "line_items": [{"description": "UberX trip", "quantity": 1, "price": 22.50}],
+            "extraction": {}
+        }
+
+        result = ReceiptService.determine_category(extracted)
+
+        self.assertEqual(result['category'], 'Transport: Taxis/Cab/Uber')
+        self.assertGreaterEqual(result['confidence'], 0.90)
+        self.assertIn('uber', result['reason'].lower())
+
+    def test_lyft_receipt_classified_correctly(self):
+        """Lyft receipt should be Transport: Taxis/Cab/Uber."""
+        extracted = {
+            "merchant": {"name": "Lyft", "address": None, "phone": None},
+            "invoice": {"invoice_number": None, "transaction_date": None},
+            "amounts": {"subtotal": 15.00, "tax": 0.00, "total": 15.00, "currency": "USD"},
+            "payment": {"method": "Debit Card"},
+            "line_items": [{"description": "Ride booking", "quantity": 1, "price": 15.00}],
+            "extraction": {}
+        }
+
+        result = ReceiptService.determine_category(extracted)
+
+        self.assertEqual(result['category'], 'Transport: Taxis/Cab/Uber')
+        self.assertGreaterEqual(result['confidence'], 0.90)
+
+    def test_airline_receipt_classified_as_flight(self):
+        """Airline receipt should be Transport: Flights."""
+        extracted = {
+            "merchant": {"name": "United Airlines", "address": None, "phone": None},
+            "invoice": {"invoice_number": "UA123456", "transaction_date": None},
+            "amounts": {"subtotal": 400.00, "tax": 50.00, "total": 450.00, "currency": "USD"},
+            "payment": {"method": "Credit Card"},
+            "line_items": [{"description": "Flight booking SFO-LAX", "quantity": 1, "price": 400.00}],
+            "extraction": {}
+        }
+
+        result = ReceiptService.determine_category(extracted)
+
+        self.assertEqual(result['category'], 'Transport: Flights')
+        self.assertGreaterEqual(result['confidence'], 0.90)
+
+    def test_delta_flight_classified_as_transport_flights_not_prepaid(self):
+        """Delta flight should be Transport: Flights, even with 'booking' word."""
+        extracted = {
+            "merchant": {"name": "Delta Airlines", "address": None, "phone": None},
+            "invoice": {"invoice_number": "DL987654", "transaction_date": None},
+            "amounts": {"subtotal": 350.00, "tax": 40.00, "total": 390.00, "currency": "USD"},
+            "payment": {"method": "Amex"},
+            "line_items": [{"description": "Flight ticket booking NYC-MIA", "quantity": 1, "price": 350.00}],
+            "extraction": {}
+        }
+
+        result = ReceiptService.determine_category(extracted)
+
+        self.assertNotEqual(result['category'], 'Prepaid Flights')
+        self.assertEqual(result['category'], 'Transport: Flights')
+
+    def test_hotel_receipt_not_confused_with_other_categories(self):
+        """Hotel receipt should be Accommodation/Hotel."""
+        extracted = {
+            "merchant": {"name": "Marriott Hotels", "address": "123 Main St", "phone": None},
+            "invoice": {"invoice_number": "CONF987654", "transaction_date": None},
+            "amounts": {"subtotal": 250.00, "tax": 40.00, "total": 290.00, "currency": "USD"},
+            "payment": {"method": "Corporate Card"},
+            "line_items": [
+                {"description": "Room booking 2 nights", "quantity": 2, "price": 125.00},
+                {"description": "Taxes and fees", "quantity": 1, "price": 40.00}
+            ],
+            "extraction": {}
+        }
+
+        result = ReceiptService.determine_category(extracted)
+
+        self.assertEqual(result['category'], 'Accommodation/Hotel')
+        self.assertGreaterEqual(result['confidence'], 0.95)
+
+    def test_merchant_name_has_higher_priority(self):
+        """Keyword in merchant name should have higher confidence than in items."""
+        extracted = {
+            "merchant": {"name": "Uber", "address": None, "phone": None},
+            "invoice": {"invoice_number": None, "transaction_date": None},
+            "amounts": {"subtotal": 20.00, "tax": 0.00, "total": 20.00, "currency": "USD"},
+            "payment": {"method": "Card"},
+            "line_items": [
+                {"description": "Ride", "quantity": 1, "price": 20.00},
+                {"description": "Tip via booking system", "quantity": 0, "price": 0}
+            ],
+            "extraction": {}
+        }
+
+        result = ReceiptService.determine_category(extracted)
+
+        self.assertEqual(result['category'], 'Transport: Taxis/Cab/Uber')
+        self.assertEqual(result['confidence'], 1.0)
+        self.assertIn('merchant name', result['reason'].lower())
+
+    def test_starbucks_breakfast_category(self):
+        """Starbucks receipt should be Food: Breakfast or Lunch."""
+        extracted = {
+            "merchant": {"name": "Starbucks Coffee", "address": None, "phone": None},
+            "invoice": {"invoice_number": "TXN001", "transaction_date": None},
+            "amounts": {"subtotal": 7.50, "tax": 0.60, "total": 8.10, "currency": "USD"},
+            "payment": {"method": "Card"},
+            "line_items": [
+                {"description": "Grande Latte", "quantity": 1, "price": 5.50},
+                {"description": "Muffin", "quantity": 1, "price": 2.00}
+            ],
+            "extraction": {}
+        }
+
+        result = ReceiptService.determine_category(extracted)
+
+        self.assertEqual(result['category'], 'Food: Breakfast or Lunch - Max Claim: €/$/AUD 15 / INR700')
+        self.assertGreaterEqual(result['confidence'], 0.80)
+
+    def test_ambiguous_receipt_returns_other_when_confidence_low(self):
+        """Ambiguous receipt with low confidence should return Other category."""
+        extracted = {
+            "merchant": {"name": "Unknown Vendor XYZ", "address": None, "phone": None},
+            "invoice": {"invoice_number": None, "transaction_date": None},
+            "amounts": {"subtotal": 10.00, "tax": 1.00, "total": 11.00, "currency": "USD"},
+            "payment": {"method": "Cash"},
+            "line_items": [{"description": "Generic item", "quantity": 1, "price": 10.00}],
+            "extraction": {}
+        }
+
+        result = ReceiptService.determine_category(extracted)
+
+        if result['confidence'] < 0.75:
+            self.assertEqual(result['category'], 'Other')
+
+    def test_multiple_vendors_same_category_consistent_classification(self):
+        """Multiple different taxi vendors should all classify as Transport: Taxis/Cab."""
+        vendors = ['Uber', 'Lyft', 'Grab', 'Ola', 'Didi']
+
+        for vendor in vendors:
+            with self.subTest(vendor=vendor):
+                extracted = {
+                    "merchant": {"name": vendor, "address": None, "phone": None},
+                    "invoice": {"invoice_number": f"{vendor}123", "transaction_date": None},
+                    "amounts": {"subtotal": 18.00, "tax": 0.00, "total": 18.00, "currency": "USD"},
+                    "payment": {"method": "Card"},
+                    "line_items": [{"description": "Ride", "quantity": 1, "price": 18.00}],
+                    "extraction": {}
+                }
+
+                result = ReceiptService.determine_category(extracted)
+
+                self.assertEqual(
+                    result['category'],
+                    'Transport: Taxis/Cab/Uber',
+                    f"Vendor {vendor} should be classified as Transport: Taxis/Cab/Uber"
+                )

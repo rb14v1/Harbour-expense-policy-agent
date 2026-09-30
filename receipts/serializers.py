@@ -58,7 +58,7 @@ class ReceiptStatusSerializer(serializers.ModelSerializer):
             'EXACT_DUPLICATE': 'Duplicate receipt detected. This exact file has already been uploaded.',
             'QUEUED_FOR_OCR': 'Receipt queued for processing.',
             'OCR_PROCESSING': 'Reading receipt details.',
-            'OCR_FAILED': f'OCR failed: {obj.duplicate_reason}',
+            'OCR_FAILED': obj.processing_message or 'Receipt processing failed.',
             'EXTRACTED': 'Receipt details extracted.',
             'NORMALIZED': 'Normalizing receipt data.',
             'DUPLICATE_CHECKING': 'Checking for duplicate expenses.',
@@ -67,8 +67,8 @@ class ReceiptStatusSerializer(serializers.ModelSerializer):
             'POLICY_PROCESSING': 'Validating against expense policy.',
             'NEEDS_REVIEW': 'Receipt approved by policy. Awaiting Finance review.',
             'APPROVED': 'Receipt approved successfully.',
-            'REJECTED': 'Receipt rejected by policy.',
-            'FAILED': 'Receipt processing failed.',
+            'REJECTED': obj.processing_message or 'Receipt rejected.',
+            'FAILED': obj.processing_message or 'Receipt processing failed.',
         }
         return messages.get(obj.status, 'Processing...')
 

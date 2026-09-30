@@ -142,6 +142,49 @@ class NormalizationService:
         except (ValueError, TypeError):
             pass
 
+        month_map = {
+            'jan': 1, 'january': 1,
+            'feb': 2, 'february': 2,
+            'mar': 3, 'march': 3,
+            'apr': 4, 'april': 4,
+            'may': 5,
+            'jun': 6, 'june': 6,
+            'jul': 7, 'july': 7,
+            'aug': 8, 'august': 8,
+            'sep': 9, 'sept': 9, 'september': 9,
+            'oct': 10, 'october': 10,
+            'nov': 11, 'november': 11,
+            'dec': 12, 'december': 12,
+        }
+
+        month_names = '|'.join(month_map.keys())
+        month_name_patterns = [
+            r'(\d{1,2})\s+(' + month_names + r')\s+(\d{4})',
+            r'(' + month_names + r')\s+(\d{1,2}),?\s+(\d{4})',
+        ]
+
+        for pattern in month_name_patterns:
+            match = re.search(pattern, date_str, re.IGNORECASE)
+            if match:
+                try:
+                    groups = match.groups()
+                    if len(groups) == 3:
+                        if groups[0].isdigit():
+                            day = int(groups[0])
+                            month_str = groups[1].lower()
+                            year = int(groups[2])
+                        else:
+                            month_str = groups[0].lower()
+                            day = int(groups[1])
+                            year = int(groups[2])
+
+                        month_num = month_map.get(month_str)
+                        if month_num and 1 <= day <= 31 and 1900 <= year <= 2100:
+                            parsed = datetime(year, month_num, day)
+                            return parsed.date().isoformat()
+                except (ValueError, TypeError):
+                    continue
+
         try:
             for fmt in ['%d/%m/%Y', '%m/%d/%Y', '%d-%m-%Y', '%m-%d-%Y',
                         '%d.%m.%Y', '%m.%d.%Y', '%d %b %Y', '%d %b %y']:

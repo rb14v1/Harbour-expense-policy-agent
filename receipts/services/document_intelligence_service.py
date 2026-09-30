@@ -2,6 +2,7 @@ from django.conf import settings
 from azure.ai.documentintelligence import DocumentIntelligenceClient
 from azure.core.credentials import AzureKeyCredential
 from receipts.exceptions import DocumentExtractionError
+from datetime import datetime
 import logging
 import re
 
@@ -160,11 +161,16 @@ class DocumentIntelligenceService:
                 logger.debug(f"Extracted payment method from OCR text: {result['payment_method']}")
                 break
 
-        date_pattern = r'(\d{4}-\d{2}-\d{2})(?:\s+\d{2}:\d{2})?'
-        match = re.search(date_pattern, content)
-        if match:
-            result["transaction_date"] = match.group(1)
-            logger.debug(f"Extracted transaction date from OCR text: {result['transaction_date']}")
+        month_name_date = self._extract_month_name_date(content)
+        if month_name_date:
+            result["transaction_date"] = month_name_date
+            logger.debug(f"Extracted textual month-name transaction date from OCR: {result['transaction_date']}")
+        else:
+            date_pattern = r'(\d{4}-\d{2}-\d{2})(?:\s+\d{2}:\d{2})?'
+            match = re.search(date_pattern, content)
+            if match:
+                result["transaction_date"] = match.group(1)
+                logger.debug(f"Extracted ISO transaction date from OCR text: {result['transaction_date']}")
 
         subtotal_pattern = r'SUBTOTAL\s*[:=]?\s*[₹$€£¥]?\s*([\d,]+\.?\d*)'
         match = re.search(subtotal_pattern, content, re.IGNORECASE)
@@ -187,6 +193,70 @@ class DocumentIntelligenceService:
                 logger.debug(f"Failed to parse tax amount: {str(e)}")
 
         return result
+
+    def _extract_month_name_date(self, content: str) -> str:
+        """
+        Extract textual month-name dates from OCR text.
+        Month-name dates are unambiguous (e.g., "5 Sept 2026" is always September 5, 2026).
+        Returns ISO format date string (YYYY-MM-DD) or None if not found.
+        """
+        if not content or not isinstance(content, str):
+            return None
+
+        month_map = {
+            'jan': 1, 'january': 1,
+            'feb': 2, 'february': 2,
+            'mar': 3, 'march': 3,
+            'apr': 4, 'april': 4,
+            'may': 5,
+            'jun': 6, 'june': 6,
+            'jul': 7, 'july': 7,
+            'aug': 8, 'august': 8,
+            'sep': 9, 'sept': 9, 'september': 9,
+            'oct': 10, 'october': 10,
+            'nov': 11, 'november': 11,
+            'dec': 12, 'december': 12,
+        }
+
+        month_names = '|'.join(month_map.keys())
+        date_patterns = [
+            r'(\d{1,2})\s+(' + month_names + r')\s+(\d{4})',
+            r'(' + month_names + r')\s+(\d{1,2}),?\s+(\d{4})',
+        ]
+
+        try:
+            for pattern in date_patterns:
+                matches = re.finditer(pattern, content, re.IGNORECASE)
+                for match in matches:
+                    try:
+                        groups = match.groups()
+                        if len(groups) == 3:
+                            if groups[0].isdigit():
+                                day = int(groups[0])
+                                month_str = groups[1].lower()
+                                year = int(groups[2])
+                            else:
+                                month_str = groups[0].lower()
+                                day = int(groups[1])
+                                year = int(groups[2])
+
+                            month_num = month_map.get(month_str)
+                            if month_num and 1 <= day <= 31 and 1900 <= year <= 2100:
+                                try:
+                                    parsed_date = datetime(year, month_num, day)
+                                    iso_date = parsed_date.date().isoformat()
+                                    logger.debug(f"Extracted month-name date from OCR: {match.group(0)} -> {iso_date}")
+                                    return iso_date
+                                except ValueError:
+                                    continue
+
+                    except (ValueError, AttributeError, TypeError):
+                        continue
+
+        except Exception as e:
+            logger.debug(f"Error extracting month-name date: {str(e)}")
+
+        return None
 
     def _parse_result(self, result) -> dict:
         extracted = {
@@ -239,8 +309,10 @@ class DocumentIntelligenceService:
             logger.info("=== END AZURE FIELDS ===")
 
             fallback = {}
+            month_name_date = None
             if ocr_content:
                 fallback = self._extract_from_ocr_text(ocr_content)
+                month_name_date = self._extract_month_name_date(ocr_content)
 
             merchant_name = self._get_field_value(fields.get('MerchantName'))
             if merchant_name:
@@ -267,7 +339,11 @@ class DocumentIntelligenceService:
                 logger.debug(f"Extracted invoice number from OCR text fallback: {fallback['invoice_number']}")
 
             transaction_date = self._get_field_value(fields.get('TransactionDate'))
-            if transaction_date:
+
+            if month_name_date:
+                extracted['invoice']['transaction_date'] = month_name_date
+                logger.info(f"Preferred textual month-name transaction date from OCR: {month_name_date}")
+            elif transaction_date:
                 extracted['invoice']['transaction_date'] = str(transaction_date)
                 logger.debug(f"Extracted transaction date from structured field: {transaction_date}")
             elif fallback.get('transaction_date'):
