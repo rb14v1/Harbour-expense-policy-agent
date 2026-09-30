@@ -1,0 +1,510 @@
+import { useState, useEffect } from 'react';
+import {
+  getFinanceReceipts,
+  getFinanceReceiptDetail,
+  getFinanceCategories,
+  submitFinanceDecision,
+  getReceiptPreviewUrl
+} from '../api/financeAPI';
+import type { ReceiptListItem, ReceiptDetail, FilterParams } from '../types/Finance';
+import '../styles/finance.css';
+
+interface FiltersState extends FilterParams {
+  page: number;
+}
+
+export default function FinanceDashboard() {
+  const [receipts, setReceipts] = useState<ReceiptListItem[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [categories, setCategories] = useState<string[]>([]);
+  const [pagination, setPagination] = useState<{ count: number; next: number | null; previous: number | null }>({ count: 0, next: null, previous: null });
+  const [filters, setFilters] = useState<FiltersState>({
+    status: '',
+    category: '',
+    vendor: '',
+    filename: '',
+    date_from: '',
+    date_to: '',
+    amount_min: '',
+    amount_max: '',
+    page: 1
+  });
+  const [selectedReceipt, setSelectedReceipt] = useState<ReceiptDetail | null>(null);
+  const [showModal, setShowModal] = useState(false);
+  const [deciding, setDeciding] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState('');
+
+  useEffect(() => {
+    loadCategories();
+    loadReceipts(filters);
+  }, []);
+
+  const loadCategories = async () => {
+    try {
+      const cats = await getFinanceCategories();
+      setCategories(cats);
+    } catch (err) {
+      console.error('Failed to load categories:', err);
+    }
+  };
+
+  const loadReceipts = async (params: FiltersState) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await getFinanceReceipts(params);
+      setReceipts(response.results);
+      setPagination({ count: response.count, next: response.next, previous: response.previous });
+    } catch (err) {
+      setError('Failed to load receipts. Please try again.');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleFilterChange = (field: keyof FiltersState, value: string) => {
+    const newFilters = { ...filters, [field]: value, page: 1 };
+    setFilters(newFilters);
+  };
+
+  const handleApplyFilters = () => {
+    loadReceipts(filters);
+  };
+
+  const handleClearFilters = () => {
+    const cleared = {
+      status: '',
+      category: '',
+      vendor: '',
+      filename: '',
+      date_from: '',
+      date_to: '',
+      amount_min: '',
+      amount_max: '',
+      page: 1
+    };
+    setFilters(cleared);
+    setRejectionReason('');
+    setTimeout(() => loadReceipts(cleared), 0);
+  };
+
+  const handleViewDetails = async (receipt: ReceiptListItem) => {
+    try {
+      const detail = await getFinanceReceiptDetail(receipt.id);
+      setSelectedReceipt(detail);
+      setShowModal(true);
+      setRejectionReason('');
+    } catch (err) {
+      setError('Failed to load receipt details');
+    }
+  };
+
+  const handleDecision = async (decision: 'APPROVED' | 'REJECTED') => {
+    if (!selectedReceipt) return;
+    if (decision === 'REJECTED' && !rejectionReason.trim()) {
+      setError('Please provide a rejection reason');
+      return;
+    }
+
+    setDeciding(true);
+    try {
+      await submitFinanceDecision(selectedReceipt.id, decision, rejectionReason);
+      setShowModal(false);
+      setSelectedReceipt(null);
+      setRejectionReason('');
+      await loadReceipts(filters);
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : 'Failed to submit decision';
+      setError(errMsg);
+    } finally {
+      setDeciding(false);
+    }
+  };
+
+  const handlePaginate = (page: number) => {
+    const newFilters = { ...filters, page };
+    setFilters(newFilters);
+    loadReceipts(newFilters);
+  };
+
+  const countByStatus = {
+    needs_review: receipts.filter(r => r.status === 'NEEDS_REVIEW').length,
+    approved: receipts.filter(r => r.status === 'APPROVED').length,
+    rejected: receipts.filter(r => r.status === 'REJECTED').length,
+    duplicate: receipts.filter(r => ['EXACT_DUPLICATE', 'SEMANTIC_DUPLICATE'].includes(r.status)).length
+  };
+
+  return (
+    <div className="finance-container">
+      <div className="finance-wrapper">
+        {/* Header */}
+        <div className="finance-header">
+          <h1>Finance Dashboard</h1>
+          <p>Review, validate and manage submitted expense receipts</p>
+        </div>
+
+        {/* Stats */}
+        <div className="stats-grid">
+          <div className="stat-card review">
+            <div className="stat-label">Pending Review</div>
+            <div className="stat-value">{countByStatus.needs_review}</div>
+          </div>
+          <div className="stat-card approved">
+            <div className="stat-label">Approved</div>
+            <div className="stat-value">{countByStatus.approved}</div>
+          </div>
+          <div className="stat-card rejected">
+            <div className="stat-label">Rejected</div>
+            <div className="stat-value">{countByStatus.rejected}</div>
+          </div>
+          <div className="stat-card duplicate">
+            <div className="stat-label">Duplicates</div>
+            <div className="stat-value">{countByStatus.duplicate}</div>
+          </div>
+        </div>
+
+        {/* Filters */}
+        <div className="filters-section">
+          <div className="filters-header">🔍 Filters</div>
+          <div className="filters-grid">
+            <div className="filter-group">
+              <label className="filter-label">Status</label>
+              <select
+                className="filter-input"
+                value={filters.status}
+                onChange={(e) => handleFilterChange('status', e.target.value)}
+              >
+                <option value="">All Statuses</option>
+                <option value="NEEDS_REVIEW">Needs Review</option>
+                <option value="APPROVED">Approved</option>
+                <option value="REJECTED">Rejected</option>
+                <option value="UNIQUE">Unique</option>
+                <option value="EXACT_DUPLICATE">Exact Duplicate</option>
+                <option value="SEMANTIC_DUPLICATE">Semantic Duplicate</option>
+              </select>
+            </div>
+
+            <div className="filter-group">
+              <label className="filter-label">Category</label>
+              <select
+                className="filter-input"
+                value={filters.category}
+                onChange={(e) => handleFilterChange('category', e.target.value)}
+              >
+                <option value="">All Categories</option>
+                {categories.map(cat => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="filter-group">
+              <label className="filter-label">Vendor</label>
+              <input
+                type="text"
+                className="filter-input"
+                placeholder="Search vendor..."
+                value={filters.vendor}
+                onChange={(e) => handleFilterChange('vendor', e.target.value)}
+              />
+            </div>
+
+            <div className="filter-group">
+              <label className="filter-label">Filename</label>
+              <input
+                type="text"
+                className="filter-input"
+                placeholder="Search filename..."
+                value={filters.filename}
+                onChange={(e) => handleFilterChange('filename', e.target.value)}
+              />
+            </div>
+
+            <div className="filter-group">
+              <label className="filter-label">Date From</label>
+              <input
+                type="date"
+                className="filter-input"
+                value={filters.date_from}
+                onChange={(e) => handleFilterChange('date_from', e.target.value)}
+              />
+            </div>
+
+            <div className="filter-group">
+              <label className="filter-label">Date To</label>
+              <input
+                type="date"
+                className="filter-input"
+                value={filters.date_to}
+                onChange={(e) => handleFilterChange('date_to', e.target.value)}
+              />
+            </div>
+
+            <div className="filter-group">
+              <label className="filter-label">Amount Min</label>
+              <input
+                type="number"
+                className="filter-input"
+                placeholder="0.00"
+                step="0.01"
+                value={filters.amount_min}
+                onChange={(e) => handleFilterChange('amount_min', e.target.value)}
+              />
+            </div>
+
+            <div className="filter-group">
+              <label className="filter-label">Amount Max</label>
+              <input
+                type="number"
+                className="filter-input"
+                placeholder="0.00"
+                step="0.01"
+                value={filters.amount_max}
+                onChange={(e) => handleFilterChange('amount_max', e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="filter-actions">
+            <button className="btn btn-primary" onClick={handleApplyFilters}>
+              🔍 Search
+            </button>
+            <button className="btn btn-secondary" onClick={handleClearFilters}>
+              ✕ Clear Filters
+            </button>
+          </div>
+        </div>
+
+        {/* Error */}
+        {error && (
+          <div className="error-state" style={{ marginBottom: '1.5rem' }}>
+            <strong>Error:</strong> {error}
+          </div>
+        )}
+
+        {/* Results */}
+        <div className="results-section">
+          <div className="results-header">
+            <span>Receipts</span>
+            <span className="result-count">{pagination.count} total</span>
+          </div>
+
+          {loading ? (
+            <div className="state-message loading-state">
+              <div className="spinner"></div>
+              <p>Loading receipts...</p>
+            </div>
+          ) : receipts.length === 0 ? (
+            <div className="state-message empty-state">
+              <div className="empty-icon">📭</div>
+              <p>No receipts found. Try adjusting your filters.</p>
+            </div>
+          ) : (
+            <>
+              <table className="receipts-table">
+                <thead>
+                  <tr>
+                    <th>Filename</th>
+                    <th>Vendor</th>
+                    <th>Date</th>
+                    <th>Amount</th>
+                    <th>Category</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {receipts.map(receipt => (
+                    <tr key={receipt.id}>
+                      <td className="receipt-filename">{receipt.original_filename}</td>
+                      <td className="receipt-vendor">{receipt.vendor_name || '—'}</td>
+                      <td>{receipt.transaction_date ? new Date(receipt.transaction_date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '—'}</td>
+                      <td className="receipt-amount">
+                        {receipt.currency || 'N/A'} {receipt.total_amount ? receipt.total_amount.toFixed(2) : '0.00'}
+                      </td>
+                      <td>{receipt.category || '—'}</td>
+                      <td>
+                        <span className={`status-badge status-${receipt.status.toLowerCase().replace(/_/g, '-')}`}>
+                          {receipt.status.replace(/_/g, ' ')}
+                        </span>
+                      </td>
+                      <td>
+                        <div className="table-actions">
+                          <button
+                            className="action-btn action-btn-view"
+                            onClick={() => handleViewDetails(receipt)}
+                          >
+                            View
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              {/* Pagination */}
+              {(pagination.next || pagination.previous) && (
+                <div className="pagination">
+                  <button
+                    className="pagination-btn"
+                    disabled={!pagination.previous}
+                    onClick={() => handlePaginate(filters.page - 1)}
+                  >
+                    ← Previous
+                  </button>
+                  <span className="pagination-info">Page {filters.page}</span>
+                  <button
+                    className="pagination-btn"
+                    disabled={!pagination.next}
+                    onClick={() => handlePaginate(filters.page + 1)}
+                  >
+                    Next →
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Modal */}
+      {showModal && selectedReceipt && (
+        <div className="modal-overlay" onClick={() => !deciding && setShowModal(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Receipt Details</h2>
+              <button className="modal-close" onClick={() => !deciding && setShowModal(false)}>×</button>
+            </div>
+
+            <div className="modal-content">
+              {/* Receipt Info */}
+              <div className="modal-section">
+                <div className="modal-section-title">Receipt Information</div>
+                <div className="modal-field">
+                  <div className="modal-field-label">Filename</div>
+                  <div className="modal-field-value">{selectedReceipt.original_filename}</div>
+                </div>
+                <div className="modal-field">
+                  <div className="modal-field-label">Vendor</div>
+                  <div className="modal-field-value">{selectedReceipt.vendor_name || '—'}</div>
+                </div>
+                <div className="modal-field">
+                  <div className="modal-field-label">Date</div>
+                  <div className="modal-field-value">
+                    {selectedReceipt.transaction_date
+                      ? new Date(selectedReceipt.transaction_date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+                      : '—'}
+                  </div>
+                </div>
+                <div className="modal-field">
+                  <div className="modal-field-label">Amount</div>
+                  <div className="modal-field-value">
+                    {selectedReceipt.currency || 'N/A'} {selectedReceipt.total_amount ? selectedReceipt.total_amount.toFixed(2) : '0.00'}
+                  </div>
+                </div>
+                <div className="modal-field">
+                  <div className="modal-field-label">Category</div>
+                  <div className="modal-field-value">{selectedReceipt.category || '—'}</div>
+                </div>
+              </div>
+
+              {/* Processing */}
+              <div className="modal-section">
+                <div className="modal-section-title">Processing Status</div>
+                <div className="modal-field">
+                  <div className="modal-field-label">Status</div>
+                  <div>
+                    <span className={`status-badge status-${selectedReceipt.status.toLowerCase().replace(/_/g, '-')}`}>
+                      {selectedReceipt.status.replace(/_/g, ' ')}
+                    </span>
+                  </div>
+                </div>
+                {selectedReceipt.duplicate_reason && (
+                  <div className="modal-field">
+                    <div className="modal-field-label">Duplicate Info</div>
+                    <div className="modal-field-value">{selectedReceipt.duplicate_reason}</div>
+                  </div>
+                )}
+                {selectedReceipt.policy_status && (
+                  <div className="modal-field">
+                    <div className="modal-field-label">Policy Status</div>
+                    <div className="modal-field-value">{selectedReceipt.policy_status}</div>
+                  </div>
+                )}
+              </div>
+
+              {/* Actions */}
+              {['NEEDS_REVIEW', 'UNIQUE'].includes(selectedReceipt.status) && (
+                <div className="modal-section">
+                  <div className="modal-section-title">Finance Decision</div>
+
+                  {rejectionReason === 'reject' && (
+                    <div className="decision-form">
+                      <div className="form-group">
+                        <label className="form-label">Rejection Reason (Required)</label>
+                        <textarea
+                          className="form-textarea"
+                          placeholder="Provide a reason for rejection..."
+                          value={rejectionReason === 'reject' ? '' : rejectionReason}
+                          onChange={(e) => setRejectionReason(e.target.value)}
+                          disabled={deciding}
+                        />
+                      </div>
+                      <div style={{ display: 'flex', gap: '1rem' }}>
+                        <button
+                          className="btn btn-primary"
+                          onClick={() => handleDecision('REJECTED')}
+                          disabled={deciding}
+                        >
+                          {deciding ? 'Submitting...' : 'Confirm Rejection'}
+                        </button>
+                        <button
+                          className="btn btn-secondary"
+                          onClick={() => setRejectionReason('')}
+                          disabled={deciding}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {rejectionReason !== 'reject' && (
+                    <div className="modal-actions">
+                      <button
+                        className="btn btn-primary"
+                        onClick={() => handleDecision('APPROVED')}
+                        disabled={deciding}
+                      >
+                        ✓ Approve
+                      </button>
+                      <button
+                        className="btn btn-secondary"
+                        onClick={() => setRejectionReason('reject')}
+                        disabled={deciding}
+                      >
+                        ✗ Reject
+                      </button>
+                      <a
+                        href={getReceiptPreviewUrl(selectedReceipt.id)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="btn btn-secondary"
+                        style={{ textDecoration: 'none', textAlign: 'center' }}
+                      >
+                        📄 Preview
+                      </a>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
