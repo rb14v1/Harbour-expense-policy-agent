@@ -234,9 +234,12 @@ class DocumentIntelligenceService:
                 logger.debug(f"Failed to parse tax amount: {str(e)}")
 
         # Try to extract total/fare amount with various labels
-        # Patterns cover: "Total:", "Total Amount:", "Total Payable:", "Fare:", "Bill Amount:", "Amount to pay:" etc.
+        # Patterns cover: "Total:", "Total Amount:", "Total Payable:", "Bill Amount:", "Amount to pay:" etc.
+        # Use word boundaries (\b) for FARE and BILL to avoid matching "Base Fare" or "Pay Bill"
         total_patterns = [
-            r'(?:TOTAL|TOTAL\s*AMOUNT|TOTAL\s*PAYABLE|BILL\s*AMOUNT|AMOUNT\s*TO\s*PAY|FARE|TRIP\s*FARE|BILL|RIDE\s*AMOUNT)\s*[:=]?\s*[₹$€£¥]?\s*([\d,]+\.?\d*)',
+            r'(?:TOTAL|TOTAL\s*AMOUNT|TOTAL\s*PAYABLE|BILL\s*AMOUNT|AMOUNT\s*TO\s*PAY)\s*[:=]?\s*[₹$€£¥]?\s*([\d,]+\.?\d*)',
+            # Separate pattern for ride-specific labels (lower priority, use word boundary)
+            r'(?:\bFARE\b|\bRIDE\s*AMOUNT\b|TRIP\s*(?:AMOUNT|FARE))\s*[:=]?\s*[₹$€£¥]?\s*([\d,]+\.?\d*)',
         ]
 
         for pattern in total_patterns:

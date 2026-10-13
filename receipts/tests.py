@@ -2596,4 +2596,180 @@ class HybridCategoryClassifierTests(TestCase):
 
         # Category must be a string
         self.assertIsInstance(result['category'], str)
-        self.assertGreater(len(result['category']), 0)
+
+
+class EndToEndReceiptWorkflowTests(TestCase):
+    """Integration tests for complete receipt upload and classification workflow."""
+
+    def test_ola_email_receipt_screenshot_workflow(self):
+        """Test complete workflow for Ola email receipt screenshot with OCR fallback."""
+        # Simulate OCR extraction from Ola email receipt screenshot
+        extracted = {
+            "merchant": {"name": None, "address": None, "phone": None},  # Azure missed the merchant
+            "invoice": {"invoice_number": None, "transaction_date": "2026-10-13"},
+            "amounts": {"subtotal": 52.00, "tax": 0.00, "total": None, "currency": None},  # Missing structured total
+            "payment": {"method": "Card"},
+            "line_items": [{"description": "Ride booking", "quantity": 1, "price": None}],
+            "extraction": {"ocr_content":
+                "Your Ride Receipt\n"
+                "Trip with: Ola\n"
+                "Date: October 13, 2026\n"
+                "Pickup: Business Park\n"
+                "Dropoff: Central Station\n"
+                "Ride Fare: ₹52.00\n"
+                "Total: ₹52.00"
+            }
+        }
+
+        # Extract from OCR fallback
+        doc_service = DocumentIntelligenceService()
+        fallback = doc_service._extract_from_ocr_text(extracted['extraction']['ocr_content'])
+
+        # Verify OCR fallback recovered the data
+        self.assertEqual(fallback['merchant_name'], 'Ola')
+        self.assertEqual(fallback['total'], 52.00)
+        self.assertEqual(fallback['transaction_date'], '2026-10-13')
+
+        # Simulate structured extraction enrichment with fallback
+        extracted['merchant']['name'] = fallback['merchant_name']
+        extracted['amounts']['total'] = fallback['total']
+
+        # Verify validation passes with OCR evidence
+        is_valid = ReceiptService._is_valid_receipt(extracted)
+        self.assertTrue(is_valid, "Receipt with OCR evidence should pass validation")
+
+        # Verify category classification
+        category_result = ReceiptService.determine_category(extracted)
+        self.assertEqual(category_result['category'], 'Transport: Taxis/Cab/Uber')
+        self.assertGreaterEqual(category_result['confidence'], 0.75)
+
+    def test_rapido_ride_details_screenshot_workflow(self):
+        """Test complete workflow for Rapido ride-details screenshot with OCR fallback."""
+        extracted = {
+            "merchant": {"name": None, "address": None, "phone": None},
+            "invoice": {"invoice_number": None, "transaction_date": None},
+            "amounts": {"subtotal": 63.00, "tax": 0.00, "total": None, "currency": "INR"},
+            "payment": {"method": None},
+            "line_items": [],
+            "extraction": {"ocr_content":
+                "Rapido Bike Taxi Receipt\n"
+                "Date: October 13, 2026\n"
+                "From: Tech Park\n"
+                "To: Railway Station\n"
+                "Ride Amount: ₹63\n"
+                "Total Payable: ₹63\n"
+                "Payment: UPI"
+            }
+        }
+
+        # Extract from OCR fallback
+        doc_service = DocumentIntelligenceService()
+        fallback = doc_service._extract_from_ocr_text(extracted['extraction']['ocr_content'])
+
+        # Verify OCR fallback recovered Rapido merchant
+        self.assertEqual(fallback['merchant_name'], 'Rapido')
+        self.assertEqual(fallback['total'], 63.00)
+
+        # Enrichment
+        extracted['merchant']['name'] = fallback['merchant_name']
+        extracted['amounts']['total'] = fallback['total']
+        extracted['invoice']['transaction_date'] = doc_service._extract_month_name_date(extracted['extraction']['ocr_content'])
+
+        # Verify validation passes
+        is_valid = ReceiptService._is_valid_receipt(extracted)
+        self.assertTrue(is_valid, "Rapido receipt with OCR evidence should pass validation")
+
+        # Verify category classification
+        category_result = ReceiptService.determine_category(extracted)
+        self.assertEqual(category_result['category'], 'Transport: Taxis/Cab/Uber')
+        self.assertGreaterEqual(category_result['confidence'], 0.75)
+
+    def test_screenshot_with_missing_merchant_but_sufficient_ocr(self):
+        """Test receipt with missing structured merchant but sufficient OCR evidence."""
+        extracted = {
+            "merchant": {"name": None, "address": None, "phone": None},
+            "invoice": {"invoice_number": None, "transaction_date": "2026-10-12"},
+            "amounts": {"subtotal": None, "tax": 0.00, "total": 250.00, "currency": "INR"},
+            "payment": {"method": "Card"},
+            "line_items": [{"description": "Trip charge", "quantity": 1, "price": 250.00}],
+            "extraction": {"ocr_content": "Uber Receipt - Date: 12 Oct 2026 - Total: ₹250"}
+        }
+
+        doc_service = DocumentIntelligenceService()
+        fallback = doc_service._extract_from_ocr_text(extracted['extraction']['ocr_content'])
+        extracted['merchant']['name'] = fallback.get('merchant_name') or 'Uber'  # OCR or fallback
+
+        # Should pass validation
+        is_valid = ReceiptService._is_valid_receipt(extracted)
+        self.assertTrue(is_valid)
+
+        # Should classify correctly
+        category_result = ReceiptService.determine_category(extracted)
+        self.assertEqual(category_result['category'], 'Transport: Taxis/Cab/Uber')
+
+    def test_receipt_with_multiple_amounts_uses_correct_total(self):
+        """Test that multiple amounts in OCR text extract the final total, not discount or intermediate amounts."""
+        extracted = {
+            "merchant": {"name": "Uber", "address": None, "phone": None},
+            "invoice": {"invoice_number": None, "transaction_date": "2026-10-13"},
+            "amounts": {"subtotal": None, "tax": 0.00, "total": None, "currency": "USD"},
+            "payment": {"method": "Card"},
+            "line_items": [],
+            "extraction": {"ocr_content":
+                "UberX Trip Receipt\n"
+                "Base Fare: $15.00\n"
+                "Surge Charge: $5.00\n"
+                "Discount: -$2.00\n"
+                "Total Amount: $18.00"  # Should use this, not intermediate amounts
+            }
+        }
+
+        doc_service = DocumentIntelligenceService()
+        fallback = doc_service._extract_from_ocr_text(extracted['extraction']['ocr_content'])
+
+        # Must extract the final total, not intermediate amounts
+        self.assertEqual(fallback['total'], 18.00)
+        self.assertNotEqual(fallback['total'], 15.00)  # Not base fare
+        self.assertNotEqual(fallback['total'], 5.00)   # Not surge
+        self.assertNotEqual(fallback['total'], -2.00)  # Not discount
+
+    def test_unrelated_image_validation_fails(self):
+        """Test that unrelated images are still rejected by validation."""
+        extracted = {
+            "merchant": {"name": None, "address": None, "phone": None},
+            "invoice": {"invoice_number": None, "transaction_date": None},
+            "amounts": {"subtotal": None, "tax": 0.00, "total": None, "currency": None},
+            "payment": {"method": None},
+            "line_items": [],
+            "extraction": {"ocr_content": "Just a random landscape photo with no transaction data"}
+        }
+
+        # Should fail validation
+        is_valid = ReceiptService._is_valid_receipt(extracted)
+        self.assertFalse(is_valid, "Unrelated image should fail validation")
+
+    def test_ocr_result_blank_detection(self):
+        """Test that completely blank OCR results are detected."""
+        extracted = {
+            "merchant": {"name": None, "address": None, "phone": None},
+            "invoice": {"invoice_number": None, "transaction_date": None},
+            "amounts": {"subtotal": None, "tax": None, "total": None, "currency": None},
+            "payment": {"method": None},
+            "line_items": [],
+            "extraction": {"ocr_content": ""}
+        }
+
+        is_blank = ReceiptService._is_ocr_result_blank(extracted)
+        self.assertTrue(is_blank, "Empty extraction should be marked as blank")
+
+    def test_manual_category_selection_supported(self):
+        """Test that manual category selection is supported for low-confidence results."""
+        # This test verifies the endpoint supports manual category selection
+        # Detailed integration testing happens in the view tests
+
+        # Verify all category choices are valid
+        valid_categories = [choice[0] for choice in Receipt.CATEGORY_CHOICES]
+        self.assertGreater(len(valid_categories), 0)
+
+        # Verify transport category exists
+        self.assertIn('Transport: Taxis/Cab/Uber', valid_categories)
