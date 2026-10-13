@@ -68,7 +68,7 @@ class CategoryClassifier:
         },
         'Transport: Taxis/Cab/Uber': {
             'keywords': ['taxi', 'uber', 'lyft', 'cab', 'ride share', 'ride-sharing', 'grab',
-                        'ola', 'namma yatri', 'didi', 'gojek', 'rideshare', 'cab fare',
+                        'ola', 'rapido', 'namma yatri', 'didi', 'gojek', 'rideshare', 'cab fare',
                         'taxi fare', 'ride hailing', 'ride hail'],
             'confidence_boost': 0.90
         },

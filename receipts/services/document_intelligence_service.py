@@ -139,7 +139,18 @@ class DocumentIntelligenceService:
 
         logger.debug(f"OCR content available ({len(content)} chars): {content[:200]}...")
 
-        # Extract merchant/vendor name from explicitly labelled fields
+        # Known merchant aliases for common ride-sharing and service platforms
+        known_merchants = {
+            'ola': 'Ola',
+            'rapido': 'Rapido',
+            'uber': 'Uber',
+            'lyft': 'Lyft',
+            'grab': 'Grab',
+            'didi': 'Didi',
+            'gojek': 'Gojek',
+        }
+
+        # Extract merchant/vendor name from explicitly labelled fields first
         merchant_patterns = [
             r'MERCHANT\s*(?:NAME)?\s*[:=]\s*([^\n]+?)(?:\n|$)',
             r'VENDOR\s*(?:NAME)?\s*[:=]\s*([^\n]+?)(?:\n|$)',
@@ -155,8 +166,18 @@ class DocumentIntelligenceService:
                     # Exclude common greetings and personal identifiers
                     if not re.search(r'^\s*(welcome|hello|hi|dear|sir|madam|mr|ms|mrs|dr|driver|passenger)\b', merchant_candidate, re.IGNORECASE):
                         result["merchant_name"] = merchant_candidate
-                        logger.debug(f"Extracted merchant name from OCR text: {result['merchant_name']}")
+                        logger.debug(f"Extracted merchant name from explicit label in OCR text: {result['merchant_name']}")
                         break
+
+        # If no labelled merchant found, check for known merchant names in OCR text
+        if not result["merchant_name"]:
+            for keyword, merchant_name in known_merchants.items():
+                # Match whole word boundaries to avoid false matches (e.g., "polar" containing "ola")
+                pattern = r'\b' + keyword + r'\b'
+                if re.search(pattern, content, re.IGNORECASE):
+                    result["merchant_name"] = merchant_name
+                    logger.debug(f"Extracted known merchant '{merchant_name}' from OCR text")
+                    break
 
         invoice_patterns = [
             r'RECEIPT\s*(?:NO\.?|NUMBER)?\s*[:=]?\s*([A-Z0-9\-]+)',
@@ -211,6 +232,27 @@ class DocumentIntelligenceService:
                 logger.debug(f"Extracted tax from OCR text: {result['tax']}")
             except (ValueError, AttributeError) as e:
                 logger.debug(f"Failed to parse tax amount: {str(e)}")
+
+        # Try to extract total/fare amount with various labels
+        # Patterns cover: "Total:", "Total Amount:", "Total Payable:", "Fare:", "Bill Amount:", "Amount to pay:" etc.
+        total_patterns = [
+            r'(?:TOTAL|TOTAL\s*AMOUNT|TOTAL\s*PAYABLE|BILL\s*AMOUNT|AMOUNT\s*TO\s*PAY|FARE|TRIP\s*FARE|BILL|RIDE\s*AMOUNT)\s*[:=]?\s*[₹$€£¥]?\s*([\d,]+\.?\d*)',
+        ]
+
+        for pattern in total_patterns:
+            match = re.search(pattern, content, re.IGNORECASE)
+            if match:
+                try:
+                    amount_str = match.group(1).replace(',', '')
+                    total_amount = float(amount_str)
+                    # Only use if we haven't already found a total from structured fields
+                    # (structured fields are set in _parse_result, not here)
+                    logger.debug(f"Extracted total/fare amount from OCR text: {total_amount}")
+                    # Store it for use in validation - will be merged with structured data in _parse_result
+                    result["total"] = total_amount
+                    break
+                except (ValueError, AttributeError) as e:
+                    logger.debug(f"Failed to parse total amount: {str(e)}")
 
         return result
 
@@ -399,9 +441,12 @@ class DocumentIntelligenceService:
             if total is not None:
                 try:
                     extracted['amounts']['total'] = float(total)
-                    logger.debug(f"Extracted total amount: {total}")
+                    logger.debug(f"Extracted total amount from structured field: {total}")
                 except (ValueError, TypeError) as e:
                     logger.warning(f"Failed to parse total: {total} ({str(e)})")
+            elif fallback.get('total') is not None:
+                extracted['amounts']['total'] = fallback['total']
+                logger.debug(f"Extracted total amount from OCR text fallback: {fallback['total']}")
 
             currency = self._get_field_value(fields.get('Currency'))
             if currency:

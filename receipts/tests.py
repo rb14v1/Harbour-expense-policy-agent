@@ -368,6 +368,73 @@ class DocumentIntelligenceServiceTests(TestCase):
         result = self.service._extract_from_ocr_text(content)
         self.assertIsNone(result['merchant_name'])
 
+    def test_extract_from_ocr_text_ola_known_merchant(self):
+        """OCR text containing 'Ola' should be recognized as known merchant."""
+        content = (
+            "Trip Summary\n"
+            "Booked via: Ola\n"
+            "Date: 5 Sept 2026\n"
+            "Fare: ₹250.00\n"
+            "Total: ₹250.00"
+        )
+        result = self.service._extract_from_ocr_text(content)
+        self.assertEqual(result['merchant_name'], 'Ola')
+
+    def test_extract_from_ocr_text_rapido_known_merchant(self):
+        """OCR text containing 'Rapido' should be recognized as known merchant."""
+        content = (
+            "Bike Taxi Receipt\n"
+            "Service: Rapido\n"
+            "Date: 5 Sept 2026\n"
+            "Trip Amount: ₹120.00\n"
+            "Total: ₹120.00"
+        )
+        result = self.service._extract_from_ocr_text(content)
+        self.assertEqual(result['merchant_name'], 'Rapido')
+
+    def test_extract_from_ocr_text_total_amount_various_labels(self):
+        """Total amount should be extracted with various labels like Fare, Bill, etc."""
+        test_cases = [
+            ("Total Amount: 100", 100.0),
+            ("FARE: ₹250.50", 250.50),
+            ("Bill Amount: $45.00", 45.0),
+            ("Amount to Pay: 500", 500.0),
+        ]
+        for content, expected_amount in test_cases:
+            with self.subTest(content=content):
+                result = self.service._extract_from_ocr_text(content)
+                self.assertEqual(result['total'], expected_amount, f"Failed to extract {expected_amount} from: {content}")
+
+    def test_extract_from_ocr_text_ola_screenshot_scenario(self):
+        """OCR text from Ola email receipt screenshot should extract merchant and amount."""
+        content = (
+            "Your Ride Receipt\n"
+            "Trip with: Ola\n"
+            "Date: 12 Oct 2026\n"
+            "Pickup: ABC Street\n"
+            "Dropoff: XYZ Plaza\n"
+            "Ride Fare: ₹287.50\n"
+            "Total Amount: ₹287.50"
+        )
+        result = self.service._extract_from_ocr_text(content)
+        self.assertEqual(result['merchant_name'], 'Ola')
+        self.assertEqual(result['total'], 287.50)
+        self.assertEqual(result['transaction_date'], '2026-10-12')
+
+    def test_extract_from_ocr_text_rapido_screenshot_scenario(self):
+        """OCR text from Rapido screenshot should extract merchant and amount."""
+        content = (
+            "Rapido Bike Taxi Receipt\n"
+            "Date: October 13, 2026\n"
+            "From: Business Park\n"
+            "To: Central Station\n"
+            "Ride Amount: ₹95\n"
+            "Total Payable: ₹95"
+        )
+        result = self.service._extract_from_ocr_text(content)
+        self.assertEqual(result['merchant_name'], 'Rapido')
+        self.assertEqual(result['total'], 95.0)
+
 
 class DuplicateServiceTests(TestCase):
     def setUp(self):
