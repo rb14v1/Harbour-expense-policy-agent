@@ -322,6 +322,52 @@ class DocumentIntelligenceServiceTests(TestCase):
         result = self.service._extract_from_ocr_text(content)
         self.assertEqual(result['invoice_number'], "INV-2026-001")
 
+    def test_extract_from_ocr_text_merchant_name_explicit_label(self):
+        """Merchant name should be extracted from explicitly labelled field."""
+        content = "MERCHANT NAME: ABC Restaurant\nDate: 5 Sept 2026\nTotal: 100"
+        result = self.service._extract_from_ocr_text(content)
+        self.assertEqual(result['merchant_name'], "ABC Restaurant")
+
+    def test_extract_from_ocr_text_vendor_name_explicit_label(self):
+        """Vendor name should be extracted using Vendor: label."""
+        content = "VENDOR NAME: XYZ Coffee Shop\nDate: 5 Sept 2026\nTotal: 50"
+        result = self.service._extract_from_ocr_text(content)
+        self.assertEqual(result['merchant_name'], "XYZ Coffee Shop")
+
+    def test_extract_from_ocr_text_business_name_explicit_label(self):
+        """Business name should be extracted using Business Name: label."""
+        content = "BUSINESS NAME: My Store\nINVOICE NO: 123\nDate: 5 Sept 2026"
+        result = self.service._extract_from_ocr_text(content)
+        self.assertEqual(result['merchant_name'], "My Store")
+
+    def test_extract_from_ocr_text_no_merchant_without_label(self):
+        """Merchant name should not be extracted without explicit label."""
+        content = "ABC Restaurant\nDate: 5 Sept 2026\nTotal: 100"
+        result = self.service._extract_from_ocr_text(content)
+        self.assertIsNone(result['merchant_name'])
+
+    def test_extract_from_ocr_text_exclude_driver_name(self):
+        """Driver receipt should not identify driver name as merchant."""
+        content = (
+            "Driver: John Smith\n"
+            "Trip Details: Airport Transfer\n"
+            "Date: 5 Sept 2026\n"
+            "Total: 50"
+        )
+        result = self.service._extract_from_ocr_text(content)
+        # Driver name should not be extracted without explicit merchant label
+        self.assertIsNone(result['merchant_name'])
+
+    def test_extract_from_ocr_text_exclude_greeting(self):
+        """Receipt with greeting should not extract greeting as merchant."""
+        content = (
+            "Welcome to Our Store\n"
+            "Date: 5 Sept 2026\n"
+            "Total: 100"
+        )
+        result = self.service._extract_from_ocr_text(content)
+        self.assertIsNone(result['merchant_name'])
+
 
 class DuplicateServiceTests(TestCase):
     def setUp(self):

@@ -125,6 +125,7 @@ class DocumentIntelligenceService:
     def _extract_from_ocr_text(self, content: str) -> dict:
         """Fallback extraction from raw OCR text for fields Azure doesn't provide."""
         result = {
+            "merchant_name": None,
             "invoice_number": None,
             "payment_method": None,
             "transaction_date": None,
@@ -137,6 +138,25 @@ class DocumentIntelligenceService:
             return result
 
         logger.debug(f"OCR content available ({len(content)} chars): {content[:200]}...")
+
+        # Extract merchant/vendor name from explicitly labelled fields
+        merchant_patterns = [
+            r'MERCHANT\s*(?:NAME)?\s*[:=]\s*([^\n]+?)(?:\n|$)',
+            r'VENDOR\s*(?:NAME)?\s*[:=]\s*([^\n]+?)(?:\n|$)',
+            r'BUSINESS\s*(?:NAME)?\s*[:=]\s*([^\n]+?)(?:\n|$)',
+        ]
+
+        for pattern in merchant_patterns:
+            match = re.search(pattern, content, re.IGNORECASE)
+            if match:
+                merchant_candidate = match.group(1).strip()
+                # Validate merchant name: not too long, not obviously an address/greeting
+                if merchant_candidate and 2 <= len(merchant_candidate) <= 100:
+                    # Exclude common greetings and personal identifiers
+                    if not re.search(r'^\s*(welcome|hello|hi|dear|sir|madam|mr|ms|mrs|dr|driver|passenger)\b', merchant_candidate, re.IGNORECASE):
+                        result["merchant_name"] = merchant_candidate
+                        logger.debug(f"Extracted merchant name from OCR text: {result['merchant_name']}")
+                        break
 
         invoice_patterns = [
             r'RECEIPT\s*(?:NO\.?|NUMBER)?\s*[:=]?\s*([A-Z0-9\-]+)',
@@ -318,7 +338,10 @@ class DocumentIntelligenceService:
             if merchant_name:
                 merchant_name = self._clean_vendor_name(merchant_name)
                 extracted['merchant']['name'] = merchant_name
-                logger.debug(f"Extracted merchant name: {merchant_name}")
+                logger.debug(f"Extracted merchant name from structured field: {merchant_name}")
+            elif fallback.get('merchant_name'):
+                extracted['merchant']['name'] = fallback['merchant_name']
+                logger.debug(f"Extracted merchant name from OCR text fallback: {fallback['merchant_name']}")
 
             merchant_address = self._get_field_value(fields.get('MerchantAddress'))
             if merchant_address:
