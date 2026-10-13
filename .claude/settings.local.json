@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python manage.py test receipts finance --no-input -v 0)",
+      "Bash(python -c \"import pypdf; print\\('pypdf installed'\\)\")"
+    ]
+  }
+}

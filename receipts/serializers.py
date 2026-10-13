@@ -52,6 +52,15 @@ class ReceiptStatusSerializer(serializers.ModelSerializer):
         return stages.get(obj.status, 'unknown')
 
     def get_message(self, obj):
+        if obj.status == 'REJECTED':
+            if obj.policy_status == 'APPROVED':
+                return 'Receipt has been reviewed and rejected by Finance.'
+            else:
+                return obj.processing_message or 'Receipt was rejected by the expense policy.'
+
+        if obj.status == 'APPROVED':
+            return 'Receipt has been reviewed and approved by Finance.'
+
         messages = {
             'UPLOADED': 'Receipt uploaded successfully.',
             'HASHING': 'Calculating file hash.',
@@ -65,9 +74,7 @@ class ReceiptStatusSerializer(serializers.ModelSerializer):
             'SEMANTIC_DUPLICATE': 'Possible duplicate expense detected. A matching expense already exists.',
             'UNIQUE': 'No duplicate found. Checking expense policy.',
             'POLICY_PROCESSING': 'Validating against expense policy.',
-            'NEEDS_REVIEW': 'Receipt approved by policy. Awaiting Finance review.',
-            'APPROVED': 'Receipt approved successfully.',
-            'REJECTED': obj.processing_message or 'Receipt rejected.',
+            'NEEDS_REVIEW': 'Receipt has been validated and approved by policy. Awaiting Finance review.',
             'FAILED': obj.processing_message or 'Receipt processing failed.',
         }
         return messages.get(obj.status, 'Processing...')

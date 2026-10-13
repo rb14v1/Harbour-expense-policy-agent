@@ -11,6 +11,7 @@ from receipts.services.normalization_service import NormalizationService
 from receipts.services.duplicate_service import DuplicateService
 from receipts.services.policy_service import PolicyService
 from receipts.services.file_processing_service import FileProcessingService
+from receipts.services.category_classifier import CategoryClassifier
 from receipts.exceptions import BlobUploadError, DocumentExtractionError, CompressionError
 
 
@@ -213,13 +214,12 @@ class ReceiptService:
     @staticmethod
     def determine_category(extracted: dict) -> dict:
         """
-        Determine receipt category with confidence score.
+        Determine receipt category using hybrid keyword + semantic classification.
 
-        Uses intelligent keyword matching:
-        1. First, matches keywords in merchant_name (highest priority, +0.15 confidence)
-        2. Then, matches keywords in line_items and payment_method
-        3. Returns highest confidence match
-        4. Avoids generic keyword matches when more specific matches exist
+        Uses a two-stage approach:
+        1. Keyword matching (fast, deterministic)
+        2. Semantic similarity matching (understands context)
+        3. Combines both using configurable weights
 
         Returns dict:
         {
@@ -228,145 +228,15 @@ class ReceiptService:
             'reason': 'Why this category was selected'
         }
 
-        Confidence >= 0.80 suggests automatic assignment.
-        Confidence < 0.80 suggests user confirmation needed.
+        Confidence >= 0.75 (configurable) suggests automatic assignment.
+        Confidence < 0.75 suggests user confirmation needed.
         """
-        if not extracted:
-            return {
-                'category': 'Other',
-                'confidence': 0.0,
-                'reason': 'No receipt data available'
-            }
-
-        merchant_name = (extracted.get('merchant', {}).get('name') or '').lower()
-        line_items = extracted.get('line_items', [])
-        line_items_desc = ' '.join([str(item.get('description', '')).lower() for item in line_items])
-        payment_method = (extracted.get('payment', {}).get('method') or '').lower()
-
-        category_keywords = {
-            'Accommodation/Hotel': {
-                'keywords': ['hotel', 'motel', 'resort', 'airbnb', 'lodging', 'inn', 'accommodation', 'holiday inn', 'marriott', 'hilton', 'hyatt', 'sheraton', 'westin', 'best western', 'ritz', 'radisson', 'novotel', 'accor', 'ihg'],
-                'confidence_boost': 0.95
-            },
-            'Transport: Flights': {
-                'keywords': ['airline', 'flight', 'aircraft', 'airfare', 'aviation', 'united', 'american', 'delta', 'southwest', 'virgin', 'lufthansa', 'british airways', 'qantas', 'air france', 'icelandair'],
-                'confidence_boost': 0.90
-            },
-            'Transport: Luas/Bus/Train': {
-                'keywords': ['train', 'railway', 'luas', 'bus', 'transit', 'metro', 'amtrak', 'greyhound', 'rail', 'transport', 'eurostar'],
-                'confidence_boost': 0.85
-            },
-            'Transport: Taxis/Cab/Uber': {
-                'keywords': ['taxi', 'uber', 'lyft', 'cab', 'ride share', 'ride-sharing', 'grab', 'ola', 'didi', 'gojek'],
-                'confidence_boost': 0.90
-            },
-            'Transport: Car Rental & Fuel': {
-                'keywords': ['car rental', 'rental', 'hertz', 'enterprise', 'avis', 'budget', 'thrifty', 'alamo', 'europcar', 'fuel', 'gas station', 'petrol'],
-                'confidence_boost': 0.90
-            },
-            'Software': {
-                'keywords': ['software', 'subscription', 'saas', 'cloud', 'license', 'app store', 'microsoft', 'adobe', 'google', 'amazon', 'aws', 'azure', 'github', 'slack', 'salesforce', 'dropbox'],
-                'confidence_boost': 0.85
-            },
-            'Food: Dinner - Max Claim: €/$/AUD 45 / INR700': {
-                'keywords': ['restaurant', 'dinner', 'dinner time', 'olive garden', 'applebee', 'cheesecake factory', 'ruth chris', 'morton', 'texas roadhouse', 'red lobster', 'nobu'],
-                'confidence_boost': 0.85
-            },
-            'Food: Breakfast or Lunch - Max Claim: €/$/AUD 15 / INR700': {
-                'keywords': ['breakfast', 'lunch', 'cafe', 'coffee', 'bistro', 'pizzeria', 'bakery', 'starbucks', 'mcdonald', 'chipotle', 'panera', 'subway', 'taco', 'burger', 'pizza', 'sandwich', 'diner'],
-                'confidence_boost': 0.80
-            },
-            'Stationery Consumables': {
-                'keywords': ['stationery', 'office supplies', 'paper', 'pen', 'ink', 'supplies', 'staples', 'office depot', 'officeworks'],
-                'confidence_boost': 0.80
-            },
-            'Training': {
-                'keywords': ['training', 'course', 'workshop', 'seminar', 'education', 'school', 'university', 'college', 'certification', 'learning'],
-                'confidence_boost': 0.85
-            },
-            'Phone Bills/Broadband': {
-                'keywords': ['phone', 'mobile', 'broadband', 'internet', 'vodafone', 'telstra', 'telecom', 'verizon', 'at&t', 'tmobile', 'comcast', 'spectrum'],
-                'confidence_boost': 0.85
-            },
-            'Bank Charges': {
-                'keywords': ['bank', 'banking fee', 'overdraft', 'wire transfer fee', 'wells fargo', 'chase', 'bank of america', 'citibank'],
-                'confidence_boost': 0.80
-            },
-            'Client Entertainment': {
-                'keywords': ['entertainment', 'movie', 'cinema', 'theatre', 'theater', 'bar', 'lounge', 'club', 'nightclub', 'concert', 'event', 'show'],
-                'confidence_boost': 0.80
-            },
-            'Computer Peripherals': {
-                'keywords': ['mouse', 'keyboard', 'monitor', 'laptop', 'computer', 'hardware', 'apple', 'dell', 'lenovo', 'hp', 'device'],
-                'confidence_boost': 0.80
-            },
-            'Travel Other incl. Parking & Tolls': {
-                'keywords': ['parking', 'toll', 'petrol station', 'gas station', 'fuel', 'park'],
-                'confidence_boost': 0.85
-            },
-            'Print & Postage': {
-                'keywords': ['print', 'postage', 'shipping', 'courier', 'post office', 'fedex', 'ups', 'dhl'],
-                'confidence_boost': 0.80
-            },
-            'Prepaid Flights': {
-                'keywords': ['flight booking', 'airline booking', 'ticket booking', 'expedia', 'kayak'],
-                'confidence_boost': 0.85
-            },
-            'Prepaid Accommodation': {
-                'keywords': ['hotel booking', 'accommodation booking', 'airbnb booking', 'booking.com', 'trivago'],
-                'confidence_boost': 0.85
-            },
-            'Prepaid Car Rental & Fuel': {
-                'keywords': ['car rental booking', 'fuel prepaid'],
-                'confidence_boost': 0.85
-            }
-        }
-
-        best_match = None
-        best_confidence = 0.0
-        match_reason = ''
-        match_source = ''
-
-        for category, config in category_keywords.items():
-            keywords_sorted = sorted(config['keywords'], key=len, reverse=True)
-
-            for keyword in keywords_sorted:
-                keyword_words = keyword.split()
-                match_found_in_merchant = False
-                match_found_in_other = False
-
-                if len(keyword_words) == 1:
-                    match_found_in_merchant = keyword_words[0] in merchant_name.split()
-                    match_found_in_other = keyword_words[0] in (line_items_desc + ' ' + payment_method).split()
-                else:
-                    match_found_in_merchant = keyword in merchant_name
-                    match_found_in_other = keyword in (line_items_desc + ' ' + payment_method)
-
-                if match_found_in_merchant or match_found_in_other:
-                    confidence = config['confidence_boost']
-                    if match_found_in_merchant:
-                        confidence = min(1.0, confidence + 0.15)
-                        match_source = 'merchant name'
-                    else:
-                        match_source = 'receipt details'
-
-                    if confidence > best_confidence:
-                        best_confidence = confidence
-                        best_match = category
-                        match_reason = f"Matched '{keyword}' in {match_source}"
-                    break
-
-        if best_match and best_confidence >= 0.75:
-            return {
-                'category': best_match,
-                'confidence': best_confidence,
-                'reason': match_reason
-            }
-
+        result = CategoryClassifier.classify(extracted)
+        # Return only the fields expected by existing callers
         return {
-            'category': 'Other',
-            'confidence': 0.5,
-            'reason': 'No reliable category match found'
+            'category': result.get('category', 'Other'),
+            'confidence': result.get('confidence', 0.0),
+            'reason': result.get('reason', 'Classification failed')
         }
 
     @staticmethod

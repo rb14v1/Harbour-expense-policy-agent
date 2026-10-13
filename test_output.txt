@@ -1,0 +1,30 @@
+============================= test session starts =============================
+platform win32 -- Python 3.14.6, pytest-9.1.1, pluggy-1.6.0 -- C:\Users\admin\AppData\Local\Programs\Python\Python314\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\admin\Downloads\expense-policy-agent\expense-policy-agent
+plugins: anyio-4.14.2, Faker-37.12.0, langsmith-0.10.16
+collecting ... ERROR: found no collectors for C:\Users\admin\Downloads\expense-policy-agent\expense-policy-agent\receipts\tests.py::HybridCategoryClassifierTests
+
+collected 0 items / 1 error
+
+=================================== ERRORS ====================================
+_____________________ ERROR collecting receipts/tests.py ______________________
+receipts\tests.py:3: in <module>
+    from receipts.models import Receipt
+receipts\models.py:5: in <module>
+    class Receipt(models.Model):
+..\..\..\AppData\Local\Programs\Python\Python314\Lib\site-packages\django\db\models\base.py:129: in __new__
+    app_config = apps.get_containing_app_config(module)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+..\..\..\AppData\Local\Programs\Python\Python314\Lib\site-packages\django\apps\registry.py:260: in get_containing_app_config
+    self.check_apps_ready()
+..\..\..\AppData\Local\Programs\Python\Python314\Lib\site-packages\django\apps\registry.py:137: in check_apps_ready
+    settings.INSTALLED_APPS
+..\..\..\AppData\Local\Programs\Python\Python314\Lib\site-packages\django\conf\__init__.py:81: in __getattr__
+    self._setup(name)
+..\..\..\AppData\Local\Programs\Python\Python314\Lib\site-packages\django\conf\__init__.py:61: in _setup
+    raise ImproperlyConfigured(
+E   django.core.exceptions.ImproperlyConfigured: Requested setting INSTALLED_APPS, but settings are not configured. You must either define the environment variable DJANGO_SETTINGS_MODULE or call settings.configure() before accessing settings.
+=========================== short test summary info ===========================
+ERROR receipts/tests.py - django.core.exceptions.ImproperlyConfigured: Reques...
+============================== 1 error in 0.88s ===============================

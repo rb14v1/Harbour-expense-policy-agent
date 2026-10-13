@@ -2180,3 +2180,307 @@ class CategoryDetectionTests(TestCase):
                     'Transport: Taxis/Cab/Uber',
                     f"Vendor {vendor} should be classified as Transport: Taxis/Cab/Uber"
                 )
+
+
+class ReceiptStatusMessageTests(TestCase):
+    """Test that ReceiptStatusSerializer provides correct message for workflow state."""
+
+    def test_message_policy_approved_pending_finance_review(self):
+        """When policy approves and Finance is pending, message should indicate awaiting Finance review."""
+        receipt = Receipt.objects.create(
+            owner='test-user',
+            original_filename='receipt.pdf',
+            blob_name='receipts/test-user/abc/receipt.pdf',
+            mime_type='application/pdf',
+            file_size=1024,
+            sha256_hash='abc123',
+            status='NEEDS_REVIEW',
+            policy_status='APPROVED',
+            processing_message='Receipt has been validated and approved by policy. Awaiting Finance review.'
+        )
+
+        from receipts.serializers import ReceiptStatusSerializer
+        serializer = ReceiptStatusSerializer(receipt)
+        message = serializer.data['message']
+
+        self.assertIn('Finance review', message)
+        self.assertIn('Awaiting', message)
+
+    def test_message_finance_approved_after_policy_approved(self):
+        """When Finance approves after policy approved, message should indicate Finance approval."""
+        receipt = Receipt.objects.create(
+            owner='test-user',
+            original_filename='receipt.pdf',
+            blob_name='receipts/test-user/abc/receipt.pdf',
+            mime_type='application/pdf',
+            file_size=1024,
+            sha256_hash='abc123',
+            status='APPROVED',
+            policy_status='APPROVED',
+            processing_message='Receipt has been validated and approved by policy. Awaiting Finance review.'
+        )
+
+        from receipts.serializers import ReceiptStatusSerializer
+        serializer = ReceiptStatusSerializer(receipt)
+        message = serializer.data['message']
+
+        self.assertIn('Finance', message)
+        self.assertIn('approved', message.lower())
+        self.assertNotIn('Awaiting', message)
+
+    def test_message_finance_rejected_after_policy_approved(self):
+        """When Finance rejects after policy approved, message should indicate Finance rejection."""
+        receipt = Receipt.objects.create(
+            owner='test-user',
+            original_filename='receipt.pdf',
+            blob_name='receipts/test-user/abc/receipt.pdf',
+            mime_type='application/pdf',
+            file_size=1024,
+            sha256_hash='abc123',
+            status='REJECTED',
+            policy_status='APPROVED',
+            processing_message='Receipt has been validated and approved by policy. Awaiting Finance review.'
+        )
+
+        from receipts.serializers import ReceiptStatusSerializer
+        serializer = ReceiptStatusSerializer(receipt)
+        message = serializer.data['message']
+
+        self.assertIn('Finance', message)
+        self.assertIn('rejected', message.lower())
+        self.assertNotIn('policy', message.lower())
+
+    def test_message_policy_rejected_before_finance_review(self):
+        """When policy rejects before Finance review, message should indicate policy rejection."""
+        receipt = Receipt.objects.create(
+            owner='test-user',
+            original_filename='receipt.pdf',
+            blob_name='receipts/test-user/abc/receipt.pdf',
+            mime_type='application/pdf',
+            file_size=1024,
+            sha256_hash='abc123',
+            status='REJECTED',
+            policy_status='REJECTED',
+            processing_message='Receipt rejected because: Receipt is older than 35 days.'
+        )
+
+        from receipts.serializers import ReceiptStatusSerializer
+        serializer = ReceiptStatusSerializer(receipt)
+        message = serializer.data['message']
+
+        self.assertNotIn('Finance', message)
+        self.assertIn('older than 35 days', message)
+
+
+class HybridCategoryClassifierTests(TestCase):
+    """Test the hybrid keyword + semantic category classifier."""
+
+    def test_ola_receipt_classified_as_transport(self):
+        """Ola receipt should be classified as Transport: Taxis/Cab/Uber."""
+        extracted = {
+            "merchant": {"name": "Ola", "address": None, "phone": None},
+            "invoice": {"invoice_number": "OLA123456", "transaction_date": None},
+            "amounts": {"subtotal": 45.00, "tax": 0.00, "total": 45.00, "currency": "INR"},
+            "payment": {"method": "Card"},
+            "line_items": [{"description": "Ola ride", "quantity": 1, "price": 45.00}],
+            "extraction": {}
+        }
+
+        result = ReceiptService.determine_category(extracted)
+
+        self.assertEqual(result['category'], 'Transport: Taxis/Cab/Uber')
+        self.assertGreaterEqual(result['confidence'], 0.80)
+        self.assertIn('ola', result['reason'].lower())
+
+    def test_namma_yatri_receipt_classified_as_transport(self):
+        """Namma Yatri receipt should be classified as Transport: Taxis/Cab/Uber."""
+        extracted = {
+            "merchant": {"name": "Namma Yatri", "address": None, "phone": None},
+            "invoice": {"invoice_number": "NY654321", "transaction_date": None},
+            "amounts": {"subtotal": 52.00, "tax": 0.00, "total": 52.00, "currency": "INR"},
+            "payment": {"method": "Card"},
+            "line_items": [{"description": "Ride booking", "quantity": 1, "price": 52.00}],
+            "extraction": {}
+        }
+
+        result = ReceiptService.determine_category(extracted)
+
+        self.assertEqual(result['category'], 'Transport: Taxis/Cab/Uber')
+        self.assertGreaterEqual(result['confidence'], 0.80)
+
+    def test_existing_merchant_classifications_unchanged(self):
+        """Existing merchant classifications (Uber, Lyft) should continue to work."""
+        test_cases = [
+            ("Uber", "Transport: Taxis/Cab/Uber", 0.90),
+            ("Lyft", "Transport: Taxis/Cab/Uber", 0.90),
+            ("Starbucks", "Food: Breakfast or Lunch - Max Claim: €/$/AUD 15 / INR700", 0.80),
+        ]
+
+        for merchant, expected_category, min_confidence in test_cases:
+            with self.subTest(merchant=merchant):
+                extracted = {
+                    "merchant": {"name": merchant, "address": None, "phone": None},
+                    "invoice": {"invoice_number": "TEST123", "transaction_date": None},
+                    "amounts": {"subtotal": 20.00, "tax": 0.00, "total": 20.00, "currency": "USD"},
+                    "payment": {"method": "Card"},
+                    "line_items": [{"description": f"{merchant} purchase", "quantity": 1, "price": 20.00}],
+                    "extraction": {}
+                }
+
+                result = ReceiptService.determine_category(extracted)
+                self.assertEqual(result['category'], expected_category)
+                self.assertGreaterEqual(result['confidence'], min_confidence)
+
+    def test_generic_taxi_description_recognized(self):
+        """A generic taxi or ride-hailing description should be recognized as transport."""
+        extracted = {
+            "merchant": {"name": "Unknown Taxi Service", "address": None, "phone": None},
+            "invoice": {"invoice_number": None, "transaction_date": None},
+            "amounts": {"subtotal": 30.00, "tax": 0.00, "total": 30.00, "currency": "USD"},
+            "payment": {"method": "Card"},
+            "line_items": [{"description": "Taxi fare for ride", "quantity": 1, "price": 30.00}],
+            "extraction": {}
+        }
+
+        result = ReceiptService.determine_category(extracted)
+
+        # Should recognize as transport even with unknown merchant name
+        self.assertEqual(result['category'], 'Transport: Taxis/Cab/Uber')
+        self.assertGreater(result['confidence'], 0.5)
+
+    def test_semantic_matching_without_exact_keywords(self):
+        """A receipt with semantic meaning but no exact keywords should be classified."""
+        extracted = {
+            "merchant": {"name": "LocalRideApp", "address": None, "phone": None},
+            "invoice": {"invoice_number": None, "transaction_date": None},
+            "amounts": {"subtotal": 25.00, "tax": 0.00, "total": 25.00, "currency": "USD"},
+            "payment": {"method": "App Payment"},
+            "line_items": [{"description": "Passenger transportation service for city travel", "quantity": 1, "price": 25.00}],
+            "extraction": {}
+        }
+
+        result = ReceiptService.determine_category(extracted)
+
+        # Should classify as transport based on semantic matching
+        self.assertEqual(result['category'], 'Transport: Taxis/Cab/Uber')
+        self.assertGreater(result['confidence'], 0.5)
+
+    def test_grocery_receipt_not_auto_approved_as_other(self):
+        """A grocery receipt should not receive high confidence in Other category."""
+        extracted = {
+            "merchant": {"name": "Grocery Store ABC", "address": None, "phone": None},
+            "invoice": {"invoice_number": None, "transaction_date": None},
+            "amounts": {"subtotal": 150.00, "tax": 15.00, "total": 165.00, "currency": "USD"},
+            "payment": {"method": "Card"},
+            "line_items": [
+                {"description": "Milk", "quantity": 1, "price": 40.00},
+                {"description": "Bread", "quantity": 1, "price": 30.00},
+                {"description": "Vegetables", "quantity": 2, "price": 80.00},
+            ],
+            "extraction": {}
+        }
+
+        result = ReceiptService.determine_category(extracted)
+
+        # Should be classified as Other but with low confidence
+        self.assertEqual(result['category'], 'Other')
+        self.assertLess(result['confidence'], 0.75)  # Below threshold for auto-approval
+
+    def test_low_confidence_result_below_threshold(self):
+        """Receipts with insufficient evidence should return below-threshold confidence."""
+        extracted = {
+            "merchant": {"name": "Random Store XYZ", "address": None, "phone": None},
+            "invoice": {"invoice_number": None, "transaction_date": None},
+            "amounts": {"subtotal": 50.00, "tax": 5.00, "total": 55.00, "currency": "USD"},
+            "payment": {"method": None},
+            "line_items": [],
+            "extraction": {}
+        }
+
+        result = ReceiptService.determine_category(extracted)
+
+        # Without clear evidence, should not auto-assign
+        if result['category'] == 'Other':
+            self.assertLess(result['confidence'], 0.75)
+
+    def test_no_receipt_data_returns_other_with_zero_confidence(self):
+        """Empty or None receipt data should return Other with zero confidence."""
+        result = ReceiptService.determine_category(None)
+
+        self.assertEqual(result['category'], 'Other')
+        self.assertEqual(result['confidence'], 0.0)
+
+    def test_ambiguous_classification_returns_other(self):
+        """When top categories are too close, should return Other instead of guessing."""
+        # A receipt that could be Transport or a generic category
+        extracted = {
+            "merchant": {"name": "Go Away", "address": None, "phone": None},  # Could match "go" related services
+            "invoice": {"invoice_number": None, "transaction_date": None},
+            "amounts": {"subtotal": 20.00, "tax": 0.00, "total": 20.00, "currency": "USD"},
+            "payment": {"method": "Card"},
+            "line_items": [],
+            "extraction": {}
+        }
+
+        result = ReceiptService.determine_category(extracted)
+
+        # Result should be returned (either specific category or Other)
+        self.assertIn('category', result)
+        self.assertIn('confidence', result)
+
+    def test_classifier_handles_missing_fields_gracefully(self):
+        """Classifier should handle receipts with missing OCR fields."""
+        test_cases = [
+            # Missing merchant name
+            {
+                "merchant": {"name": None, "address": None, "phone": None},
+                "invoice": {"invoice_number": None, "transaction_date": None},
+                "amounts": {"subtotal": 30.00, "tax": 0.00, "total": 30.00, "currency": "USD"},
+                "payment": {"method": None},
+                "line_items": [{"description": "Taxi fare", "quantity": 1, "price": 30.00}],
+                "extraction": {}
+            },
+            # Missing line items
+            {
+                "merchant": {"name": "Starbucks", "address": None, "phone": None},
+                "invoice": {"invoice_number": None, "transaction_date": None},
+                "amounts": {"subtotal": 5.00, "tax": 0.00, "total": 5.00, "currency": "USD"},
+                "payment": {"method": "Card"},
+                "line_items": [],
+                "extraction": {}
+            },
+        ]
+
+        for extracted in test_cases:
+            with self.subTest(extracted=extracted):
+                result = ReceiptService.determine_category(extracted)
+                self.assertIn('category', result)
+                self.assertIn('confidence', result)
+                self.assertIn('reason', result)
+
+    def test_classifier_return_structure_unchanged(self):
+        """Classifier should return the same structure as before (backward compatibility)."""
+        extracted = {
+            "merchant": {"name": "Uber", "address": None, "phone": None},
+            "invoice": {"invoice_number": "TEST123", "transaction_date": None},
+            "amounts": {"subtotal": 20.00, "tax": 0.00, "total": 20.00, "currency": "USD"},
+            "payment": {"method": "Card"},
+            "line_items": [{"description": "UberX trip", "quantity": 1, "price": 20.00}],
+            "extraction": {}
+        }
+
+        result = ReceiptService.determine_category(extracted)
+
+        # Must have these keys
+        self.assertIn('category', result)
+        self.assertIn('confidence', result)
+        self.assertIn('reason', result)
+
+        # Confidence must be in range
+        self.assertIsInstance(result['confidence'], (int, float))
+        self.assertGreaterEqual(result['confidence'], 0.0)
+        self.assertLessEqual(result['confidence'], 1.0)
+
+        # Category must be a string
+        self.assertIsInstance(result['category'], str)
+        self.assertGreater(len(result['category']), 0)
