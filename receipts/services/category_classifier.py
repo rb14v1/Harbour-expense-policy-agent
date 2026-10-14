@@ -187,9 +187,9 @@ class CategoryClassifier:
         Returns:
             Tuple of (best_category, best_score, reason)
         """
-        merchant_name = CategoryClassifier.normalize_text(
-            extracted.get('merchant', {}).get('name', '')
-        )
+        raw_merchant = extracted.get('merchant', {}).get('name', '')
+        merchant_name = CategoryClassifier.normalize_text(raw_merchant)
+        logger.debug(f"[KEYWORD_CLASSIFIER] Raw merchant: '{raw_merchant}' -> Normalized: '{merchant_name}'")
         line_items = extracted.get('line_items', [])
         line_items_desc = ' '.join([
             CategoryClassifier.normalize_text(item.get('description', ''))
@@ -233,6 +233,7 @@ class CategoryClassifier:
                         best_reason = f"Matched '{keyword}' in {match_source}"
                     break
 
+        logger.debug(f"[KEYWORD_CLASSIFIER] Result: category={best_category}, score={best_score}, reason={best_reason}")
         return best_category, best_score, best_reason
 
     @staticmethod

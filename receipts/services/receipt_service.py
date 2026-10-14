@@ -1,6 +1,7 @@
 import uuid
 import json
 import io
+import logging
 from django.utils import timezone
 from receipts.models import Receipt
 from receipts.services.file_validation_service import FileValidationService
@@ -13,6 +14,8 @@ from receipts.services.policy_service import PolicyService
 from receipts.services.file_processing_service import FileProcessingService
 from receipts.services.category_classifier import CategoryClassifier
 from receipts.exceptions import BlobUploadError, DocumentExtractionError, CompressionError
+
+logger = logging.getLogger(__name__)
 
 
 class ReceiptService:
@@ -85,8 +88,6 @@ class ReceiptService:
                     content_type=receipt.mime_type,
                 )
             except DocumentExtractionError as e:
-                import logging
-                logger = logging.getLogger(__name__)
                 logger.error(f"OCR extraction failed for receipt {receipt_id}: {str(e)}")
                 receipt.status = "FAILED"
                 receipt.duplicate_reason = f"Document extraction failed: {str(e)}"
@@ -123,10 +124,25 @@ class ReceiptService:
             receipt.normalized_json = normalized
             receipt.status = "NORMALIZED"
 
+            # Log what gets passed to classifier
+            merchant_for_classifier = extracted.get('merchant', {}).get('name')
+            logger.info(f"[CATEGORY_CLASSIFIER_INPUT] Receipt {receipt_id}: "
+                       f"merchant={merchant_for_classifier}, "
+                       f"has_amount={extracted.get('amounts', {}).get('total') is not None}, "
+                       f"has_date={extracted.get('invoice', {}).get('transaction_date') is not None}, "
+                       f"has_line_items={len(extracted.get('line_items', [])) > 0}")
+
             category_result = self.determine_category(extracted)
             receipt.category = category_result.get('category', 'Other')
             receipt.category_confidence = category_result.get('confidence', 0.0)
             receipt.category_reason = category_result.get('reason', '')
+
+            # Log classification result
+            logger.info(f"[CATEGORY_CLASSIFICATION] Receipt {receipt_id}: "
+                       f"category={receipt.category}, "
+                       f"confidence={receipt.category_confidence}, "
+                       f"reason={receipt.category_reason}, "
+                       f"will_ask_manual_selection={receipt.category_confidence < 0.75}")
 
             # Populate Receipt model from normalized data
             if normalized.get('vendor_name'):
@@ -303,8 +319,6 @@ class ReceiptService:
         try:
             return FileProcessingService.get_processing_copy(file_obj, mime_type, original_filename)
         except CompressionError as e:
-            import logging
-            logger = logging.getLogger(__name__)
             logger.warning(f"File compression failed: {str(e)}. Falling back to original bytes.")
             return file_bytes
 

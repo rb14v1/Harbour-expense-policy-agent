@@ -383,10 +383,12 @@ class DocumentIntelligenceService:
             if merchant_name:
                 merchant_name = self._clean_vendor_name(merchant_name)
                 extracted['merchant']['name'] = merchant_name
-                logger.debug(f"Extracted merchant name from structured field: {merchant_name}")
+                logger.info(f"[OCR_EXTRACTION] Merchant from structured field: {merchant_name}")
             elif fallback.get('merchant_name'):
                 extracted['merchant']['name'] = fallback['merchant_name']
-                logger.debug(f"Extracted merchant name from OCR text fallback: {fallback['merchant_name']}")
+                logger.info(f"[OCR_EXTRACTION] Merchant from OCR fallback: {fallback['merchant_name']}")
+            else:
+                logger.warning(f"[OCR_EXTRACTION] No merchant found - structured={merchant_name}, fallback={fallback.get('merchant_name')}")
 
             merchant_address = self._get_field_value(fields.get('MerchantAddress'))
             if merchant_address:

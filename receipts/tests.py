@@ -2773,3 +2773,129 @@ class EndToEndReceiptWorkflowTests(TestCase):
 
         # Verify transport category exists
         self.assertIn('Transport: Taxis/Cab/Uber', valid_categories)
+
+
+class OlaScreenshotClassificationTests(TestCase):
+    """
+    Tests for real Ola receipt screenshot classification scenario.
+    Simulates the exact flow when a user uploads an Ola email receipt screenshot.
+    """
+
+    def test_ola_receipt_with_ocr_fallback_classifies_as_transport(self):
+        """
+        Test that an Ola receipt extracted via OCR fallback classifies as Transport.
+
+        Simulates: User uploads Ola email receipt screenshot -> OCR fails on structured field ->
+        OCR fallback finds 'Ola' in text -> Classifier recognizes Ola as Transport ->
+        Confidence >= 0.75 -> Auto-classify (no manual selection prompt).
+        """
+        # Simulate realistic OCR extraction from Ola receipt screenshot
+        extracted_from_ocr = {
+            'merchant': {
+                'name': 'Ola',  # Extracted via OCR fallback, not structured field
+                'address': None,
+                'phone': None,
+            },
+            'invoice': {
+                'invoice_number': 'OLA123456',
+                'transaction_date': (date.today() - timedelta(days=5)).isoformat(),
+            },
+            'amounts': {
+                'subtotal': 180.00,
+                'tax': 0.0,
+                'total': 180.00,
+                'currency': 'INR',
+            },
+            'payment': {
+                'method': 'GPAY',
+            },
+            'line_items': [
+                {'description': 'Ride Fare', 'quantity': 1, 'unit_price': 180.00, 'amount': 180.00}
+            ],
+            'extraction': {
+                'provider': 'azure_ai_document_intelligence',
+                'ocr_content': 'Ola Ride\nFrom: Home\nTo: Office\nFare: 180.00\nPayment: GPAY\nDate: ...',
+            },
+        }
+
+        # Run classifier on extracted data
+        result = ReceiptService.determine_category(extracted_from_ocr)
+
+        # Verify Ola is correctly classified
+        self.assertEqual(result['category'], 'Transport: Taxis/Cab/Uber',
+                        "Ola receipt should be classified as Transport: Taxis/Cab/Uber")
+        self.assertGreaterEqual(result['confidence'], 0.75,
+                               "Ola receipt should have high confidence (>= 0.75) for auto-classification")
+        self.assertIn('ola', result['reason'].lower(),
+                     "Reason should mention Ola for transparency")
+
+    def test_rapido_receipt_with_ocr_fallback_classifies_as_transport(self):
+        """Test that a Rapido receipt classifies as Transport: Taxis/Cab/Uber."""
+        extracted_from_ocr = {
+            'merchant': {
+                'name': 'Rapido',  # Extracted via OCR fallback
+                'address': None,
+                'phone': None,
+            },
+            'invoice': {
+                'invoice_number': None,
+                'transaction_date': (date.today() - timedelta(days=3)).isoformat(),
+            },
+            'amounts': {
+                'subtotal': 120.00,
+                'tax': None,
+                'total': 120.00,
+                'currency': 'INR',
+            },
+            'payment': {
+                'method': 'Card',
+            },
+            'line_items': [],
+            'extraction': {
+                'provider': 'azure_ai_document_intelligence',
+                'ocr_content': 'Rapido Bike Taxi\nRide Details\nAmount: 120.00\nPayment Method: Card',
+            },
+        }
+
+        result = ReceiptService.determine_category(extracted_from_ocr)
+
+        self.assertEqual(result['category'], 'Transport: Taxis/Cab/Uber')
+        self.assertGreaterEqual(result['confidence'], 0.75)
+
+    def test_ola_receipt_without_merchant_name_asks_for_manual_selection(self):
+        """
+        Test that when Ola merchant name is NOT extracted (OCR failure),
+        receipt gets 'Other' category and prompts manual selection.
+        """
+        extracted_no_merchant = {
+            'merchant': {
+                'name': None,  # Extraction failed
+                'address': None,
+                'phone': None,
+            },
+            'invoice': {
+                'invoice_number': None,
+                'transaction_date': (date.today() - timedelta(days=2)).isoformat(),
+            },
+            'amounts': {
+                'subtotal': 150.00,
+                'tax': None,
+                'total': 150.00,
+                'currency': 'INR',
+            },
+            'payment': {
+                'method': None,
+            },
+            'line_items': [],
+            'extraction': {
+                'provider': 'azure_ai_document_intelligence',
+                'ocr_content': 'Unreadable ride receipt content',
+            },
+        }
+
+        result = ReceiptService.determine_category(extracted_no_merchant)
+
+        self.assertEqual(result['category'], 'Other',
+                        "Without merchant name, should default to Other")
+        self.assertLess(result['confidence'], 0.75,
+                       "Confidence should be < 0.75 to prompt manual selection")
