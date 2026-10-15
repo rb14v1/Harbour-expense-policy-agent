@@ -744,6 +744,58 @@ def get_decision_confirmation_card(receipt_id: str, decision: str, notes: Option
     }
 
 
+def get_user_manual_card(public_frontend_url: Optional[str] = None) -> Dict[str, Any]:
+    """Generate User Manual card with link to open manual in browser."""
+    if not public_frontend_url:
+        return get_error_card(
+            "User Manual URL is not configured. "
+            "Please contact your administrator to set PUBLIC_FRONTEND_URL."
+        )
+
+    manual_url = f"{public_frontend_url.rstrip('/')}/upload?manual=true"
+
+    return {
+        "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+        "type": "AdaptiveCard",
+        "version": "1.4",
+        "body": [
+            {
+                "type": "TextBlock",
+                "text": "📖 User Manual",
+                "weight": "bolder",
+                "size": "large",
+            },
+            {
+                "type": "TextBlock",
+                "text": "Access the complete Expense Policy Agent user manual to learn about receipt submission, approval workflows, and common scenarios.",
+                "wrap": True,
+                "spacing": "medium",
+            },
+            {
+                "type": "TextBlock",
+                "text": "The manual includes:",
+                "weight": "bolder",
+                "size": "small",
+                "spacing": "small",
+            },
+            {
+                "type": "TextBlock",
+                "text": "• Receipt upload process\n• Expense policy requirements\n• Duplicate detection explained\n• Finance approval workflow\n• Common questions and troubleshooting",
+                "wrap": True,
+                "size": "small",
+                "spacing": "small",
+            },
+        ],
+        "actions": [
+            {
+                "type": "Action.OpenUrl",
+                "title": "📖 Open User Manual",
+                "url": manual_url,
+            }
+        ]
+    }
+
+
 def get_error_card(error_message: str) -> Dict[str, Any]:
     """Generate error card."""
     return {

@@ -1,5 +1,6 @@
-from django.test import TestCase, override_settings
+from django.test import TestCase, override_settings, Client
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.conf import settings
 from receipts.models import Receipt
 from receipts.services import (
     HashingService,
@@ -9,12 +10,14 @@ from receipts.services import (
     PolicyService,
     ReceiptService,
 )
+from receipts.services.blob_service import BlobService
 from receipts.services.document_intelligence_service import DocumentIntelligenceService
-from receipts.exceptions import UnsupportedFileTypeError, ReceiptTooLargeError
+from receipts.exceptions import UnsupportedFileTypeError, ReceiptTooLargeError, BlobUploadError
 from datetime import datetime, timedelta, date
 from decimal import Decimal
 from unittest.mock import patch, MagicMock
 import io
+import os
 
 
 class FileValidationServiceTests(TestCase):
@@ -2899,3 +2902,123 @@ class OlaScreenshotClassificationTests(TestCase):
                         "Without merchant name, should default to Other")
         self.assertLess(result['confidence'], 0.75,
                        "Confidence should be < 0.75 to prompt manual selection")
+
+
+# User Manual Tests
+class UserManualContentTests(TestCase):
+    """Tests for user manual HTML content."""
+
+    def test_user_manual_file_exists(self):
+        """Test that the user manual HTML file exists in the repository."""
+        manual_file = os.path.join(settings.BASE_DIR, 'expense_policy_agent_user_manual.html')
+        self.assertTrue(
+            os.path.exists(manual_file),
+            f"User manual not found at {manual_file}"
+        )
+
+    def test_user_manual_file_size(self):
+        """Test that the user manual is a reasonable file size."""
+        manual_file = os.path.join(settings.BASE_DIR, 'expense_policy_agent_user_manual.html')
+        
+        file_size = os.path.getsize(manual_file)
+        # Manual should be at least 50KB (comprehensive content)
+        self.assertGreater(file_size, 50000, f"Manual seems too small: {file_size} bytes")
+        # Manual should be less than 5MB (reasonable limit)
+        self.assertLess(file_size, 5000000, f"Manual is too large: {file_size} bytes")
+
+
+class UserManualUploadTests(TestCase):
+    """Tests for uploading user manual to Blob Storage."""
+
+    def setUp(self):
+        self.manual_file = os.path.join(settings.BASE_DIR, 'expense_policy_agent_user_manual.html')
+
+    def test_blob_service_upload_file_method(self):
+        """Test that BlobService has upload_file method."""
+        blob_service = BlobService()
+        self.assertTrue(hasattr(blob_service, 'upload_file'), "BlobService missing upload_file method")
+        self.assertTrue(callable(getattr(blob_service, 'upload_file')), "upload_file is not callable")
+
+    @patch('receipts.services.blob_service.BlobServiceClient')
+    def test_upload_file_with_content_type(self, mock_blob_service_class):
+        """Test upload_file method with custom content type."""
+        # Setup mock chain
+        mock_client = MagicMock()
+        mock_container = MagicMock()
+        mock_blob = MagicMock()
+        
+        mock_blob_service_class.from_connection_string.return_value = mock_client
+        mock_client.get_container_client.return_value = mock_container
+        mock_container.get_blob_client.return_value = mock_blob
+        
+        blob_service = BlobService()
+        result = blob_service.upload_file(
+            self.manual_file,
+            'docs/manual.html',
+            'text/html; charset=utf-8'
+        )
+        
+        self.assertEqual(result, 'docs/manual.html')
+        mock_container.get_blob_client.assert_called_once_with('docs/manual.html')
+        mock_blob.upload_blob.assert_called_once()
+
+    def test_upload_file_local_file_not_found(self):
+        """Test that upload_file raises error for non-existent file."""
+        blob_service = BlobService()
+
+        with self.assertRaises(BlobUploadError) as context:
+            blob_service.upload_file(
+                '/nonexistent/path/file.html',
+                'docs/manual.html'
+            )
+
+        self.assertIn('not found', str(context.exception).lower())
+
+
+class UserManualFrontendTests(TestCase):
+    """Tests for user manual integration in frontend."""
+
+    def setUp(self):
+        self.client = Client()
+
+    def test_upload_page_loads(self):
+        """Test that the upload page loads without error."""
+        response = self.client.get('/upload/')
+        self.assertEqual(response.status_code, 200)
+
+    def test_upload_page_contains_manual_link(self):
+        """Test that the upload page contains a user manual link."""
+        response = self.client.get('/upload/')
+        content = response.content.decode('utf-8')
+        
+        self.assertIn('User Manual', content, "User Manual link not found on upload page")
+        self.assertIn('openUserManual', content, "Manual opening function not found")
+        self.assertIn('manualModal', content, "Manual modal not found")
+
+    def test_upload_page_has_manual_script(self):
+        """Test that the upload page includes manual JavaScript functions."""
+        response = self.client.get('/upload/')
+        content = response.content.decode('utf-8')
+        
+        required_functions = [
+            'openUserManual',
+            'closeUserManual',
+            'user-manual/',
+        ]
+        
+        for func in required_functions:
+            self.assertIn(func, content, f"Function/reference not found: {func}")
+
+    def test_upload_page_has_manual_styling(self):
+        """Test that the upload page includes manual CSS styles."""
+        response = self.client.get('/upload/')
+        content = response.content.decode('utf-8')
+        
+        required_styles = [
+            '.manual-modal',
+            '.manual-link',
+            '.manual-modal-content',
+        ]
+        
+        for style in required_styles:
+            self.assertIn(style, content, f"CSS style not found: {style}")

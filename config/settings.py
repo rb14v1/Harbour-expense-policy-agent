@@ -148,3 +148,6 @@ LOGGING = {
         'level': 'INFO',
     },
 }
+
+# User Manual Configuration
+MANUAL_BLOB_PATH = os.getenv('MANUAL_BLOB_PATH', 'documentation/expense_policy_agent_user_manual.html')

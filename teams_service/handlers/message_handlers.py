@@ -8,6 +8,7 @@ from typing import Optional, Any, Dict
 from microsoft_teams.apps.routing.activity_context import ActivityContext
 from microsoft_teams.cards import AdaptiveCard
 from teams_service.services.django_client import django_client
+from teams_service.config import config
 from teams_service.cards.receipt_cards import (
     get_receipt_list_card,
     get_receipt_detail_card,
@@ -15,6 +16,7 @@ from teams_service.cards.receipt_cards import (
     get_error_card,
     get_receipt_dashboard_card,
     get_filtered_results_card,
+    get_user_manual_card,
 )
 
 logger = logging.getLogger(__name__)
@@ -87,6 +89,8 @@ class FinanceMessageHandler:
         # Text-based message routing
         if "dashboard" in message_text:
             await self.handle_dashboard_request(context)
+        elif "manual" in message_text or "user manual" in message_text:
+            await self.handle_user_manual(context)
         elif "list" in message_text or "receipts" in message_text or message_text == "" or message_text == "hi" or message_text == "hello":
             await self.handle_list_receipts(context)
         elif "detail" in message_text or "open" in message_text:
@@ -95,6 +99,20 @@ class FinanceMessageHandler:
             await context.send(self._get_help_message())
         else:
             await self.handle_list_receipts(context)
+
+    async def handle_user_manual(self, context: ActivityContext) -> None:
+        """Handle request to view User Manual."""
+        logger.info("Received user manual request")
+
+        try:
+            card_dict = get_user_manual_card(config.PUBLIC_FRONTEND_URL)
+            card = AdaptiveCard.model_validate(card_dict)
+            await context.send(card)
+        except Exception as e:
+            logger.error(f"Error generating user manual card: {e}")
+            card_dict = get_error_card("Failed to load user manual. Please try again later.")
+            card = AdaptiveCard.model_validate(card_dict)
+            await context.send(card)
 
     async def handle_list_receipts(self, context: ActivityContext) -> None:
         """Handle request to list Finance-pending receipts."""
@@ -488,7 +506,9 @@ class FinanceMessageHandler:
         return ("**Expense Policy Agent - Finance Review**\n\n"
                 "**Commands:**\n"
                 "- **list** — List receipts\n"
-                "- **detail** — View receipt details\n\n"
+                "- **detail** — View receipt details\n"
+                "- **manual** — View user manual\n"
+                "- **dashboard** — View finance dashboard\n\n"
                 "**Actions in Finance Tab:**\n"
                 "- View receipt list with filters\n"
                 "- See receipt details and duplicate information\n"

@@ -1,16 +1,27 @@
 import { useEffect, useRef } from 'react';
 import { useReceiptUpload } from '../hooks/useReceiptUpload';
+import { useUserManual } from '../hooks/useUserManual';
 import ChatMessage from '../components/ChatMessage';
 import FileUploadArea from '../components/FileUploadArea';
+import UserManualModal from '../components/UserManualModal';
 import '../styles/upload.css';
 
 export default function UploadPage() {
   const [state, actions] = useReceiptUpload();
+  const { state: manualState, open: openManual, close: closeManual, retry: retryManual } = useUserManual();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
+
+  // Auto-open manual if ?manual=true parameter is present
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('manual') === 'true' && !manualState.isOpen) {
+      openManual();
+    }
+  }, []); // Empty dependency array ensures this runs only once on mount
 
   useEffect(() => {
     scrollToBottom();
@@ -31,6 +42,14 @@ export default function UploadPage() {
           <p className="header-subtitle">
             We'll extract the details, validate the expense and prepare it for Finance review.
           </p>
+          <button
+            className="upload-header-manual-btn"
+            onClick={openManual}
+            aria-label="Open user manual"
+            title="View user manual"
+          >
+            📖 User Manual
+          </button>
         </div>
 
         {/* Process Steps */}
@@ -75,6 +94,15 @@ export default function UploadPage() {
           />
         </div>
       </div>
+
+      <UserManualModal
+        isOpen={manualState.isOpen}
+        content={manualState.content}
+        isLoading={manualState.isLoading}
+        error={manualState.error}
+        onClose={closeManual}
+        onRetry={retryManual}
+      />
     </div>
   );
 }

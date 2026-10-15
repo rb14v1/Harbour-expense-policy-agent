@@ -1032,3 +1032,111 @@ class DashboardBootstrapTests(IsolatedAsyncioTestCase):
                 for action in body_item["actions"]:
                     if action.get("data", {}).get("action") in ["apply_filters", "clear_filters"]:
                         self.assertIsNone(action["data"].get("activity_id"))
+
+
+class UserManualTests(IsolatedAsyncioTestCase):
+    """Tests for User Manual functionality in Teams."""
+
+    async def test_handle_message_manual_returns_user_manual_card(self):
+        """Test that 'manual' message triggers user manual card."""
+        handler = FinanceMessageHandler()
+
+        context = MagicMock()
+        context.activity.text = "manual"
+        context.send = AsyncMock()
+
+        with patch('teams_service.handlers.message_handlers.config') as mock_config:
+            mock_config.PUBLIC_FRONTEND_URL = "http://localhost:5173"
+
+            await handler.handle_message(context)
+
+            context.send.assert_called_once()
+            # Verify that a card was sent (AdaptiveCard)
+            call_args = context.send.call_args[0][0]
+            self.assertIsNotNone(call_args)
+
+    async def test_handle_message_user_manual_command_returns_card(self):
+        """Test that 'user manual' message triggers user manual card."""
+        handler = FinanceMessageHandler()
+
+        context = MagicMock()
+        context.activity.text = "user manual"
+        context.send = AsyncMock()
+
+        with patch('teams_service.handlers.message_handlers.config') as mock_config:
+            mock_config.PUBLIC_FRONTEND_URL = "http://localhost:5173"
+
+            await handler.handle_message(context)
+
+            context.send.assert_called_once()
+
+    async def test_handle_message_help_manual_command_returns_card(self):
+        """Test that 'help manual' message triggers user manual card."""
+        handler = FinanceMessageHandler()
+
+        context = MagicMock()
+        context.activity.text = "help manual"
+        context.send = AsyncMock()
+
+        with patch('teams_service.handlers.message_handlers.config') as mock_config:
+            mock_config.PUBLIC_FRONTEND_URL = "http://localhost:5173"
+
+            await handler.handle_message(context)
+
+            context.send.assert_called_once()
+
+    async def test_user_manual_card_with_configured_url(self):
+        """Test that user manual card includes correct URL when configured."""
+        from teams_service.cards.receipt_cards import get_user_manual_card
+
+        public_url = "https://expense.example.com"
+        card = get_user_manual_card(public_url)
+
+        # Verify card structure
+        self.assertEqual(card["type"], "AdaptiveCard")
+        self.assertTrue(len(card["body"]) > 0)
+        self.assertTrue(len(card.get("actions", [])) > 0)
+
+        # Verify that action URL is set correctly
+        action = card["actions"][0]
+        self.assertIn("expense.example.com/upload", action["url"])
+
+    async def test_user_manual_card_without_configured_url(self):
+        """Test that user manual card shows error when URL not configured."""
+        from teams_service.cards.receipt_cards import get_user_manual_card
+
+        card = get_user_manual_card(None)
+
+        # Verify it's an error card
+        self.assertEqual(card["type"], "AdaptiveCard")
+        error_text = card["body"][0]["text"]
+        self.assertIn("⚠️ Error", error_text)
+
+    async def test_help_message_includes_manual_command(self):
+        """Test that help message includes manual command."""
+        help_msg = FinanceMessageHandler._get_help_message()
+
+        self.assertIn("manual", help_msg.lower())
+        self.assertIn("user manual", help_msg.lower())
+
+    async def test_existing_commands_still_work(self):
+        """Test that existing commands are not affected by manual integration."""
+        handler = FinanceMessageHandler()
+
+        context = MagicMock()
+        context.activity.text = "list"
+        context.activity.value = None
+        context.send = AsyncMock()
+
+        with patch('teams_service.handlers.message_handlers.django_client') as mock_client:
+            mock_client.get_receipts = AsyncMock(return_value={
+                "count": 0,
+                "results": [],
+                "next": None,
+                "previous": None,
+            })
+
+            await handler.handle_message(context)
+
+            # Verify list command still works
+            mock_client.get_receipts.assert_called_once_with(status="NEEDS_REVIEW", page=1)

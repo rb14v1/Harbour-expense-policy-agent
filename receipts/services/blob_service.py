@@ -41,3 +41,46 @@ class BlobService:
             blob_client.delete_blob()
         except Exception as e:
             raise BlobUploadError(f"Failed to delete blob: {str(e)}")
+
+    def upload_file(self, local_file_path: str, blob_name: str, content_type: str = None) -> str:
+        """
+        Upload a file from disk to Blob Storage.
+        Used for uploading user manual and other static documentation.
+
+        Args:
+            local_file_path: Path to local file to upload
+            blob_name: Name/path in Blob Storage (e.g., 'documentation/manual.html')
+            content_type: MIME type (e.g., 'text/html; charset=utf-8'). Auto-detected if None.
+
+        Returns:
+            blob_name if successful
+
+        Raises:
+            BlobUploadError if upload fails
+        """
+        try:
+            import os
+            if not os.path.exists(local_file_path):
+                raise BlobUploadError(f"Local file not found: {local_file_path}")
+
+            # Auto-detect content type if not provided
+            if content_type is None:
+                import mimetypes
+                content_type, _ = mimetypes.guess_type(local_file_path)
+                if content_type is None:
+                    content_type = 'application/octet-stream'
+
+            with open(local_file_path, 'rb') as file_obj:
+                blob_client = self.container_client.get_blob_client(blob_name)
+                blob_client.upload_blob(
+                    file_obj,
+                    overwrite=True,
+                    content_settings=ContentSettings(content_type=content_type)
+                )
+
+            return blob_name
+
+        except BlobUploadError:
+            raise
+        except Exception as e:
+            raise BlobUploadError(f"Failed to upload file: {str(e)}")

@@ -657,6 +657,34 @@ body {
   margin-bottom: 0.5rem;
 }
 
+.upload-header-manual-btn {
+  margin-top: 1.5rem;
+  padding: 12px 24px;
+  background: rgba(255, 255, 255, 0.95);
+  color: #667eea;
+  border: 2px solid white;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: inline-block;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  letter-spacing: 0.3px;
+}
+
+.upload-header-manual-btn:hover {
+  background: white;
+  color: #764ba2;
+  border-color: white;
+  transform: translateY(-3px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+}
+
+.upload-header-manual-btn:active {
+  transform: translateY(-1px);
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .upload-container {

@@ -41,6 +41,14 @@
   border-radius: 8px;
   margin-bottom: 2rem;
   box-shadow: var(--shadow-lg);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 2rem;
+}
+
+.finance-header-content {
+  flex: 1;
 }
 
 .finance-header h1 {
@@ -55,6 +63,34 @@
   font-size: 1.1rem;
   opacity: 0.95;
   line-height: 1.6;
+}
+
+.finance-header-manual-btn {
+  padding: 12px 24px;
+  background: rgba(255, 255, 255, 0.95);
+  color: var(--primary);
+  border: 2px solid white;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+  margin-top: 5px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  letter-spacing: 0.3px;
+}
+
+.finance-header-manual-btn:hover {
+  background: white;
+  color: var(--secondary);
+  border-color: white;
+  transform: translateY(-3px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+}
+
+.finance-header-manual-btn:active {
+  transform: translateY(-1px);
 }
 
 /* Stats Cards */

@@ -6,6 +6,8 @@ import {
   submitFinanceDecision,
   getReceiptPreviewUrl
 } from '../api/financeAPI';
+import { useUserManual } from '../hooks/useUserManual';
+import UserManualModal from '../components/UserManualModal';
 import type { ReceiptListItem, ReceiptDetail, FilterParams } from '../types/Finance';
 import '../styles/finance.css';
 
@@ -34,6 +36,7 @@ export default function FinanceDashboard() {
   const [showModal, setShowModal] = useState(false);
   const [deciding, setDeciding] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
+  const { state: manualState, open: openManual, close: closeManual, retry: retryManual } = useUserManual();
 
   useEffect(() => {
     loadCategories();
@@ -141,8 +144,18 @@ export default function FinanceDashboard() {
       <div className="finance-wrapper">
         {/* Header */}
         <div className="finance-header">
-          <h1>Finance Dashboard</h1>
-          <p>Review, validate and manage submitted expense receipts</p>
+          <div className="finance-header-content">
+            <h1>Finance Dashboard</h1>
+            <p>Review, validate and manage submitted expense receipts</p>
+          </div>
+          <button
+            className="finance-header-manual-btn"
+            onClick={openManual}
+            aria-label="Open user manual"
+            title="View user manual"
+          >
+            📖 User Manual
+          </button>
         </div>
 
         {/* Stats */}
@@ -505,6 +518,15 @@ export default function FinanceDashboard() {
           </div>
         </div>
       )}
+
+      <UserManualModal
+        isOpen={manualState.isOpen}
+        content={manualState.content}
+        isLoading={manualState.isLoading}
+        error={manualState.error}
+        onClose={closeManual}
+        onRetry={retryManual}
+      />
     </div>
   );
 }

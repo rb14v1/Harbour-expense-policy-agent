@@ -1,8 +1,9 @@
 from rest_framework import viewsets, status, parsers
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view
 from rest_framework.response import Response
 from django.shortcuts import render
-from django.http import FileResponse, Http404, JsonResponse
+from django.http import FileResponse, Http404, JsonResponse, HttpResponse
+from django.conf import settings
 from receipts.models import Receipt
 from receipts.serializers import (
     ReceiptDetailSerializer,
@@ -381,3 +382,108 @@ def download_receipt(request, receipt_id):
 
 def upload_form_view(request):
     return render(request, 'receipts/upload.html')
+
+
+@api_view(['GET'])
+def user_manual_view(request):
+    """
+    Retrieve the User Manual HTML document.
+    Serves from Azure Blob Storage if available, falls back to local static file.
+    """
+    try:
+        manual_blob_path = getattr(settings, 'MANUAL_BLOB_PATH', 'documentation/expense_policy_agent_user_manual.html')
+
+        # Try to fetch from Blob Storage
+        try:
+            blob_service = BlobService()
+            manual_bytes = blob_service.download(manual_blob_path)
+            logger.info(f"[USER_MANUAL] Retrieved from Blob Storage: {manual_blob_path}")
+
+            return HttpResponse(
+                manual_bytes,
+                content_type='text/html; charset=utf-8',
+                headers={
+                    'Cache-Control': 'public, max-age=3600',  # Cache for 1 hour
+                    'Content-Disposition': 'inline',  # Display in browser, don't download
+                }
+            )
+        except BlobUploadError as e:
+            logger.warning(f"[USER_MANUAL] Blob Storage retrieval failed: {str(e)}. Trying local fallback.")
+
+            # Fallback: Try to serve local HTML file
+            import os
+            manual_local_path = os.path.join(settings.BASE_DIR, 'expense_policy_agent_user_manual.html')
+
+            if os.path.exists(manual_local_path):
+                with open(manual_local_path, 'rb') as f:
+                    manual_bytes = f.read()
+                logger.info(f"[USER_MANUAL] Retrieved from local file: {manual_local_path}")
+
+                return HttpResponse(
+                    manual_bytes,
+                    content_type='text/html; charset=utf-8',
+                    headers={
+                        'Cache-Control': 'public, max-age=3600',
+                        'Content-Disposition': 'inline',
+                    }
+                )
+            else:
+                logger.error(f"[USER_MANUAL] Local file not found: {manual_local_path}")
+                return Response(
+                    {'error': 'User manual not available'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+
+    except Exception as e:
+        logger.error(f"[USER_MANUAL] Unexpected error retrieving manual: {str(e)}", exc_info=True)
+        return Response(
+            {'error': 'Failed to retrieve user manual'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(['GET'])
+def user_manual_info_view(request):
+    """
+    Get metadata about the user manual (availability, last updated).
+    Useful for checking if manual is available before attempting to load.
+    """
+    try:
+        manual_blob_path = getattr(settings, 'MANUAL_BLOB_PATH', 'documentation/expense_policy_agent_user_manual.html')
+        blob_service = BlobService()
+
+        try:
+            # Try to get blob properties (this is a lightweight operation)
+            blob_client = blob_service.container_client.get_blob_client(manual_blob_path)
+            blob_properties = blob_client.get_blob_properties()
+
+            return Response({
+                'available': True,
+                'last_updated': blob_properties.last_modified.isoformat() if blob_properties.last_modified else None,
+                'size_bytes': blob_properties.size if blob_properties.size else 0,
+            })
+        except:
+            # Check if local file exists
+            import os
+            manual_local_path = os.path.join(settings.BASE_DIR, 'expense_policy_agent_user_manual.html')
+
+            if os.path.exists(manual_local_path):
+                file_stats = os.stat(manual_local_path)
+                from datetime import datetime
+                last_modified = datetime.fromtimestamp(file_stats.st_mtime).isoformat()
+
+                return Response({
+                    'available': True,
+                    'last_updated': last_modified,
+                    'size_bytes': file_stats.st_size,
+                    'source': 'local',
+                })
+            else:
+                return Response({'available': False}, status=status.HTTP_404_NOT_FOUND)
+
+    except Exception as e:
+        logger.error(f"[USER_MANUAL_INFO] Error: {str(e)}", exc_info=True)
+        return Response(
+            {'error': 'Failed to retrieve manual info'},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )

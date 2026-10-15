@@ -1,0 +1,1603 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Expense Policy Agent - User Manual</title>
+    <style>
+        :root {
+            --primary-color: #0078d4;
+            --primary-dark: #005a9e;
+            --success-color: #107c10;
+            --warning-color: #ffb900;
+            --error-color: #d13438;
+            --gray-light: #f3f2f1;
+            --gray-text: #333333;
+            --gray-border: #d1d1d1;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+                'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+            line-height: 1.6;
+            color: var(--gray-text);
+            background-color: #ffffff;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+            color: white;
+            padding: 40px 20px;
+            margin-bottom: 40px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        header p {
+            font-size: 1.1em;
+            opacity: 0.95;
+        }
+
+        nav {
+            background-color: var(--gray-light);
+            padding: 20px;
+            margin-bottom: 30px;
+            border-radius: 8px;
+            border-left: 4px solid var(--primary-color);
+        }
+
+        nav h2 {
+            font-size: 1.1em;
+            margin-bottom: 15px;
+            color: var(--gray-text);
+        }
+
+        nav ul {
+            list-style: none;
+            columns: 2;
+            gap: 30px;
+        }
+
+        @media (max-width: 768px) {
+            nav ul {
+                columns: 1;
+            }
+        }
+
+        nav li {
+            margin-bottom: 10px;
+        }
+
+        nav a {
+            color: var(--primary-color);
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        nav a:hover {
+            text-decoration: underline;
+        }
+
+        section {
+            margin-bottom: 50px;
+        }
+
+        section h2 {
+            font-size: 2em;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid var(--primary-color);
+            color: var(--gray-text);
+        }
+
+        section h3 {
+            font-size: 1.4em;
+            margin-top: 25px;
+            margin-bottom: 15px;
+            color: var(--primary-dark);
+        }
+
+        section h4 {
+            font-size: 1.1em;
+            margin-top: 15px;
+            margin-bottom: 10px;
+            color: var(--gray-text);
+            font-weight: 600;
+        }
+
+        p {
+            margin-bottom: 15px;
+            line-height: 1.8;
+        }
+
+        ol, ul {
+            margin-left: 30px;
+            margin-bottom: 20px;
+        }
+
+        li {
+            margin-bottom: 8px;
+        }
+
+        .step-box {
+            background-color: var(--gray-light);
+            border-left: 4px solid var(--primary-color);
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+        }
+
+        .step-box strong {
+            color: var(--primary-color);
+        }
+
+        .diagram {
+            background-color: var(--gray-light);
+            border: 2px solid var(--gray-border);
+            padding: 30px;
+            margin: 20px 0;
+            border-radius: 8px;
+            overflow-x: auto;
+        }
+
+        .diagram svg {
+            display: block;
+            margin: 0 auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            font-size: 0.95em;
+        }
+
+        table thead {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        table th, table td {
+            padding: 12px;
+            text-align: left;
+            border: 1px solid var(--gray-border);
+        }
+
+        table tbody tr:nth-child(even) {
+            background-color: var(--gray-light);
+        }
+
+        table tbody tr:hover {
+            background-color: #e8f4f8;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 3px;
+            font-size: 0.85em;
+            font-weight: 600;
+            color: white;
+        }
+
+        .status-processing {
+            background-color: var(--warning-color);
+        }
+
+        .status-success {
+            background-color: var(--success-color);
+        }
+
+        .status-error {
+            background-color: var(--error-color);
+        }
+
+        .status-pending {
+            background-color: var(--primary-color);
+        }
+
+        .info-box {
+            background-color: #e8f4f8;
+            border-left: 4px solid var(--primary-color);
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+
+        .info-box strong {
+            color: var(--primary-color);
+        }
+
+        .warning-box {
+            background-color: #fef3cd;
+            border-left: 4px solid var(--warning-color);
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+
+        .success-box {
+            background-color: #d4edda;
+            border-left: 4px solid var(--success-color);
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+
+        .error-box {
+            background-color: #f8d7da;
+            border-left: 4px solid var(--error-color);
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+
+        .scenario-box {
+            background-color: var(--gray-light);
+            border: 1px solid var(--gray-border);
+            padding: 20px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+
+        .scenario-box h4 {
+            margin-top: 0;
+            color: var(--primary-color);
+        }
+
+        .faq-item {
+            margin-bottom: 25px;
+            border-bottom: 1px solid var(--gray-border);
+            padding-bottom: 20px;
+        }
+
+        .faq-item:last-child {
+            border-bottom: none;
+        }
+
+        .faq-question {
+            font-weight: 600;
+            color: var(--primary-color);
+            margin-bottom: 10px;
+            font-size: 1.05em;
+        }
+
+        .quick-ref {
+            background-color: var(--gray-light);
+            padding: 20px;
+            border-radius: 4px;
+            page-break-inside: avoid;
+            margin-bottom: 20px;
+        }
+
+        .glossary-term {
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid var(--gray-border);
+        }
+
+        .glossary-term:last-child {
+            border-bottom: none;
+        }
+
+        .glossary-term dt {
+            font-weight: 600;
+            color: var(--primary-color);
+            margin-bottom: 5px;
+        }
+
+        .glossary-term dd {
+            margin-left: 0;
+            color: var(--gray-text);
+        }
+
+        @media (max-width: 768px) {
+            header h1 {
+                font-size: 1.8em;
+            }
+
+            section h2 {
+                font-size: 1.6em;
+            }
+
+            section h3 {
+                font-size: 1.2em;
+            }
+
+            table {
+                font-size: 0.85em;
+            }
+
+            table th, table td {
+                padding: 8px;
+            }
+        }
+
+        @media print {
+            body {
+                background: white;
+            }
+
+            header {
+                background: #f0f0f0;
+                color: black;
+            }
+
+            section h2 {
+                page-break-after: avoid;
+            }
+
+            table {
+                page-break-inside: avoid;
+            }
+        }
+
+        footer {
+            border-top: 1px solid var(--gray-border);
+            padding-top: 20px;
+            margin-top: 40px;
+            color: #666;
+            font-size: 0.9em;
+            text-align: center;
+        }
+
+        .return-link {
+            display: inline-block;
+            margin-top: 30px;
+            padding: 10px 20px;
+            background-color: var(--primary-color);
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+
+        .return-link:hover {
+            background-color: var(--primary-dark);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Expense Policy Agent</h1>
+            <p>Complete User Manual - Employee & Finance Team Guide</p>
+        </header>
+
+        <nav>
+            <h2>Quick Navigation</h2>
+            <ul>
+                <li><a href="#introduction">Introduction</a></li>
+                <li><a href="#employee-workflow">Employee Workflow</a></li>
+                <li><a href="#expense-statuses">Expense Statuses</a></li>
+                <li><a href="#finance-workflow">Finance Workflow</a></li>
+                <li><a href="#scenarios">Common Scenarios</a></li>
+                <li><a href="#faq">Frequently Asked Questions</a></li>
+                <li><a href="#quick-reference">Quick Reference</a></li>
+                <li><a href="#glossary">Glossary</a></li>
+            </ul>
+        </nav>
+
+        <!-- SECTION A: INTRODUCTION -->
+        <section id="introduction">
+            <h2>A. Introduction</h2>
+
+            <h3>What Is the Expense Policy Agent?</h3>
+            <p>
+                The Expense Policy Agent is a cloud-based application that automates the receipt processing and
+                expense management workflow. It helps employees submit receipts for business expenses and enables
+                finance teams to review, approve, or reject submissions according to company expense policies.
+            </p>
+
+            <h3>Why Use This Application?</h3>
+            <ul>
+                <li><strong>Speed</strong>: Automatic receipt scanning eliminates manual data entry.</li>
+                <li><strong>Accuracy</strong>: Azure Document Intelligence extracts receipt details reliably.</li>
+                <li><strong>Duplicate Prevention</strong>: Prevents the same receipt from being submitted twice.</li>
+                <li><strong>Policy Compliance</strong>: Validates receipts against company expense policies automatically.</li>
+                <li><strong>Transparency</strong>: Real-time status updates keep employees informed.</li>
+                <li><strong>Efficiency</strong>: Finance team gets organized submissions ready for approval.</li>
+            </ul>
+
+            <h3>Who Uses This Application?</h3>
+            <p><strong>Employees</strong> use this application to:</p>
+            <ul>
+                <li>Upload receipt images or PDF files</li>
+                <li>Verify extracted receipt information</li>
+                <li>Select expense categories when needed</li>
+                <li>Track receipt processing status</li>
+                <li>View approval or rejection decisions</li>
+            </ul>
+
+            <p><strong>Finance Team Members</strong> use this application to:</p>
+            <ul>
+                <li>Review submitted receipts in Microsoft Teams</li>
+                <li>Verify receipt details and policy compliance</li>
+                <li>Approve or reject expense submissions</li>
+                <li>Provide feedback on policy violations</li>
+                <li>Maintain audit trail of all decisions</li>
+            </ul>
+
+            <div class="info-box">
+                <strong>Key Takeaway:</strong> This application automates routine receipt processing so both employees and finance team can focus on resolving edge cases and special approvals.
+            </div>
+        </section>
+
+        <!-- SECTION B: EMPLOYEE WORKFLOW -->
+        <section id="employee-workflow">
+            <h2>B. Employee Receipt Upload Workflow</h2>
+
+            <h3>Complete Step-by-Step Process</h3>
+
+            <div class="step-box">
+                <strong>Step 1: Access the Application</strong>
+                <p>Open your web browser and navigate to the Expense Policy Agent login page. Sign in with your company credentials.</p>
+            </div>
+
+            <div class="step-box">
+                <strong>Step 2: Navigate to Receipt Upload</strong>
+                <p>On the main dashboard, select the "Upload Receipt" option to access the receipt upload form.</p>
+            </div>
+
+            <div class="step-box">
+                <strong>Step 3: Select and Upload Receipt File</strong>
+                <p>Click the upload button and select your receipt file. Supported formats are:</p>
+                <ul>
+                    <li>PDF (.pdf) - Recommended for email receipts</li>
+                    <li>JPEG (.jpg, .jpeg) - Photos taken with your phone</li>
+                    <li>PNG (.png) - Screenshots of digital receipts</li>
+                </ul>
+                <p><strong>File size limit:</strong> Maximum 10 MB per receipt.</p>
+            </div>
+
+            <div class="step-box">
+                <strong>Step 4: Upload Accepted and Processing Begins</strong>
+                <p>The system confirms your file was accepted and displays "Processing..." status. The system now:</p>
+                <ul>
+                    <li>Stores your original receipt file securely in cloud storage</li>
+                    <li>Calculates a unique fingerprint (SHA-256 hash) of your file</li>
+                    <li>Checks if this exact receipt was already submitted (exact duplicate detection)</li>
+                </ul>
+            </div>
+
+            <div class="step-box">
+                <strong>Step 5A (If Exact Duplicate): Rejected Immediately</strong>
+                <p>If the system recognizes your file as identical to a previously uploaded receipt:</p>
+                <ul>
+                    <li>Status shows: <span class="status-badge status-error">Exact Duplicate</span></li>
+                    <li>Message: "This receipt has already been uploaded."</li>
+                    <li>No further processing occurs</li>
+                    <li>You must upload a different receipt or contact Finance if this is an error</li>
+                </ul>
+            </div>
+
+            <div class="step-box">
+                <strong>Step 5B (If Unique): Continue to OCR</strong>
+                <p>If no identical file exists, the system proceeds with automatic information extraction:</p>
+                <ul>
+                    <li>Status shows: <span class="status-badge status-processing">OCR Processing</span></li>
+                    <li>Azure Document Intelligence analyzes your receipt image</li>
+                    <li>The system extracts key fields:</li>
+                </ul>
+                <ul style="margin-left: 60px;">
+                    <li>Merchant/vendor name (store or restaurant where you purchased)</li>
+                    <li>Transaction date (when the purchase was made)</li>
+                    <li>Total amount (total cost)</li>
+                    <li>Tax amount (if shown on receipt)</li>
+                    <li>Currency (currency of the transaction)</li>
+                    <li>Payment method (cash, card, etc.)</li>
+                    <li>Line items (individual purchases, if detailed on receipt)</li>
+                </ul>
+            </div>
+
+            <div class="step-box">
+                <strong>Step 6: Automatic Category Classification</strong>
+                <p>The system analyzes the extracted receipt information to automatically determine the expense category:</p>
+                <ul>
+                    <li>The system looks for keywords in the merchant name (e.g., "taxi", "restaurant", "hotel")</li>
+                    <li>It uses advanced text analysis to understand the receipt context</li>
+                    <li>A confidence score (0-100%) is calculated</li>
+                </ul>
+                <p><strong>Two possible outcomes:</strong></p>
+                <ul>
+                    <li><strong>High Confidence (≥75%):</strong> Category is automatically assigned. For example, a receipt from "Starbucks" is automatically classified as "Food: Breakfast or Lunch".</li>
+                    <li><strong>Low Confidence (&lt;75%):</strong> System prompts you to manually select from a list of category choices. This ensures accuracy when the category is unclear.</li>
+                </ul>
+            </div>
+
+            <div class="step-box">
+                <strong>Step 7 (If Manual Selection Needed): Choose Category</strong>
+                <p>If confidence is low, a form appears showing available expense categories. Review the choices and select the most appropriate one for your receipt. Categories include (examples):</p>
+                <ul>
+                    <li>Accommodation/Hotel</li>
+                    <li>Transport: Flights, Taxis/Cab/Uber, Car Rental, etc.</li>
+                    <li>Food: Breakfast/Lunch, Dinner, Per Diem</li>
+                    <li>Software, Training, Client Entertainment</li>
+                    <li>Mileage (various options by region and vehicle type)</li>
+                    <li>Other</li>
+                </ul>
+            </div>
+
+            <div class="step-box">
+                <strong>Step 8: Semantic Duplicate Detection</strong>
+                <p>After category assignment, the system checks whether this expense is a duplicate of a previous submission:</p>
+                <ul>
+                    <li>Compares merchant name, date, and amount with previous receipts</li>
+                    <li>Looks for matching invoice numbers (strong indicator)</li>
+                    <li>Calculates a similarity score</li>
+                </ul>
+                <p><strong>If potential duplicate found:</strong></p>
+                <ul>
+                    <li>Status shows: <span class="status-badge status-error">Semantic Duplicate</span></li>
+                    <li>Message explains why it appears to be a duplicate</li>
+                    <li>Processing stops; you must clarify with Finance</li>
+                </ul>
+                <p><strong>If unique:</strong> Processing continues to policy validation</p>
+            </div>
+
+            <div class="step-box">
+                <strong>Step 9: Policy Validation</strong>
+                <p>The system automatically checks your receipt against company expense policies:</p>
+                <ul>
+                    <li><strong>Receipt Age Policy:</strong> Receipt must not be older than 35 days</li>
+                    <li><strong>Category Policies:</strong> Different categories have different rules (e.g., meal limits, mileage rates)</li>
+                </ul>
+                <p><strong>Two possible outcomes:</strong></p>
+                <ul>
+                    <li><strong>Passes:</strong> Status shows <span class="status-badge status-pending">Needs Review</span> - receipt is forwarded to Finance team</li>
+                    <li><strong>Fails:</strong> Status shows <span class="status-badge status-error">Rejected</span> - Processing stops with reason</li>
+                </ul>
+            </div>
+
+            <div class="step-box">
+                <strong>Step 10: Finance Review (if Policy Passed)</strong>
+                <p>Receipts that passed all checks are sent to the Finance team for review:</p>
+                <ul>
+                    <li>Status shows: <span class="status-badge status-pending">Needs Review</span></li>
+                    <li>Finance team verifies the receipt and extracted information</li>
+                    <li>Finance can approve the expense or reject it with a reason</li>
+                </ul>
+            </div>
+
+            <div class="step-box">
+                <strong>Step 11: Final Status and Notification</strong>
+                <p>Once Finance completes their review, your receipt status updates:</p>
+                <ul>
+                    <li><strong>Approved:</strong> <span class="status-badge status-success">Approved</span> - Your expense is approved for reimbursement</li>
+                    <li><strong>Rejected:</strong> <span class="status-badge status-error">Rejected</span> - Finance has not approved your expense; a reason is provided</li>
+                </ul>
+                <p>The updated status appears in your receipt history immediately.</p>
+            </div>
+
+            <div class="step-box">
+                <strong>Step 12: View Receipt History</strong>
+                <p>At any time, you can view all your submitted receipts and their current status. The history shows:</p>
+                <ul>
+                    <li>Receipt filename and date uploaded</li>
+                    <li>Merchant name, transaction date, and amount</li>
+                    <li>Current status (processing, approved, rejected, etc.)</li>
+                    <li>Category assigned</li>
+                    <li>Any messages from the system or Finance team</li>
+                </ul>
+            </div>
+
+            <h3>Employee Workflow Diagram</h3>
+            <div class="diagram">
+                <svg viewBox="0 0 1000 600" xmlns="http://www.w3.org/2000/svg">
+                    <!-- Title -->
+                    <text x="500" y="30" font-size="24" font-weight="bold" text-anchor="middle" fill="#0078d4">Employee Receipt Upload Workflow</text>
+
+                    <!-- Step 1 -->
+                    <rect x="50" y="80" width="120" height="60" fill="#e8f4f8" stroke="#0078d4" stroke-width="2" rx="5"/>
+                    <text x="110" y="110" font-size="12" font-weight="bold" text-anchor="middle" fill="#333">Upload Receipt</text>
+                    <text x="110" y="125" font-size="10" text-anchor="middle" fill="#333">Select file</text>
+
+                    <!-- Arrow -->
+                    <line x1="170" y1="110" x2="220" y2="110" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+                    <!-- Step 2: Hash & Exact Duplicate -->
+                    <rect x="220" y="80" width="140" height="60" fill="#fef3cd" stroke="#ffb900" stroke-width="2" rx="5"/>
+                    <text x="290" y="105" font-size="12" font-weight="bold" text-anchor="middle" fill="#333">Exact Duplicate</text>
+                    <text x="290" y="120" font-size="10" text-anchor="middle" fill="#333">Check?</text>
+
+                    <!-- Arrow down -->
+                    <line x1="290" y1="140" x2="290" y2="170" stroke="#d13438" stroke-width="2" marker-end="url(#arrowhead-error)"/>
+                    <text x="310" y="158" font-size="10" fill="#d13438" font-weight="bold">Duplicate</text>
+
+                    <!-- Reject box -->
+                    <rect x="230" y="170" width="120" height="60" fill="#f8d7da" stroke="#d13438" stroke-width="2" rx="5"/>
+                    <text x="290" y="195" font-size="12" font-weight="bold" text-anchor="middle" fill="#333">Rejected:</text>
+                    <text x="290" y="210" font-size="10" text-anchor="middle" fill="#333">Exact Duplicate</text>
+
+                    <!-- Continue arrow -->
+                    <line x1="360" y1="110" x2="410" y2="110" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)"/>
+                    <text x="385" y="105" font-size="10" fill="#107c10" font-weight="bold">Unique</text>
+
+                    <!-- Step 3: OCR -->
+                    <rect x="410" y="80" width="130" height="60" fill="#e8f4f8" stroke="#0078d4" stroke-width="2" rx="5"/>
+                    <text x="475" y="110" font-size="12" font-weight="bold" text-anchor="middle" fill="#333">OCR Processing</text>
+                    <text x="475" y="125" font-size="10" text-anchor="middle" fill="#333">Extract data</text>
+
+                    <!-- Arrow -->
+                    <line x1="540" y1="110" x2="590" y2="110" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+                    <!-- Step 4: Category -->
+                    <rect x="590" y="80" width="130" height="60" fill="#e8f4f8" stroke="#0078d4" stroke-width="2" rx="5"/>
+                    <text x="655" y="110" font-size="12" font-weight="bold" text-anchor="middle" fill="#333">Category</text>
+                    <text x="655" y="125" font-size="10" text-anchor="middle" fill="#333">Classification</text>
+
+                    <!-- Arrow -->
+                    <line x1="720" y1="110" x2="770" y2="110" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+                    <!-- Step 5: Semantic Duplicate -->
+                    <rect x="770" y="80" width="140" height="60" fill="#fef3cd" stroke="#ffb900" stroke-width="2" rx="5"/>
+                    <text x="840" y="105" font-size="12" font-weight="bold" text-anchor="middle" fill="#333">Semantic</text>
+                    <text x="840" y="120" font-size="10" text-anchor="middle" fill="#333">Duplicate Check</text>
+
+                    <!-- Arrow down for duplicate -->
+                    <line x1="840" y1="140" x2="840" y2="170" stroke="#d13438" stroke-width="2" marker-end="url(#arrowhead-error)"/>
+
+                    <!-- Reject box 2 -->
+                    <rect x="770" y="170" width="140" height="60" fill="#f8d7da" stroke="#d13438" stroke-width="2" rx="5"/>
+                    <text x="840" y="195" font-size="12" font-weight="bold" text-anchor="middle" fill="#333">Rejected:</text>
+                    <text x="840" y="210" font-size="10" text-anchor="middle" fill="#333">Semantic Duplicate</text>
+
+                    <!-- Continue arrow down -->
+                    <line x1="770" y1="110" x2="680" y2="280" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)"/>
+                    <text x="720" y="190" font-size="10" fill="#107c10" font-weight="bold">Unique</text>
+
+                    <!-- Step 6: Policy -->
+                    <rect x="610" y="280" width="140" height="60" fill="#fef3cd" stroke="#ffb900" stroke-width="2" rx="5"/>
+                    <text x="680" y="305" font-size="12" font-weight="bold" text-anchor="middle" fill="#333">Policy</text>
+                    <text x="680" y="320" font-size="10" text-anchor="middle" fill="#333">Validation</text>
+
+                    <!-- Arrow down for fail -->
+                    <line x1="680" y1="340" x2="680" y2="370" stroke="#d13438" stroke-width="2" marker-end="url(#arrowhead-error)"/>
+                    <text x="700" y="358" font-size="10" fill="#d13438" font-weight="bold">Fail</text>
+
+                    <!-- Reject box 3 -->
+                    <rect x="610" y="370" width="140" height="60" fill="#f8d7da" stroke="#d13438" stroke-width="2" rx="5"/>
+                    <text x="680" y="395" font-size="12" font-weight="bold" text-anchor="middle" fill="#333">Rejected:</text>
+                    <text x="680" y="410" font-size="10" text-anchor="middle" fill="#333">Policy Violation</text>
+
+                    <!-- Arrow right to Finance -->
+                    <line x1="750" y1="310" x2="820" y2="310" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)"/>
+                    <text x="785" y="305" font-size="10" fill="#107c10" font-weight="bold">Pass</text>
+
+                    <!-- Step 7: Finance Review -->
+                    <rect x="820" y="280" width="140" height="60" fill="#e8f4f8" stroke="#0078d4" stroke-width="2" rx="5"/>
+                    <text x="890" y="310" font-size="12" font-weight="bold" text-anchor="middle" fill="#333">Finance Review</text>
+                    <text x="890" y="325" font-size="10" text-anchor="middle" fill="#333">(Needs Review)</text>
+
+                    <!-- Arrow down -->
+                    <line x1="890" y1="340" x2="890" y2="370" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+                    <!-- Final decision -->
+                    <rect x="820" y="370" width="140" height="60" fill="#d4edda" stroke="#107c10" stroke-width="2" rx="5"/>
+                    <text x="890" y="395" font-size="12" font-weight="bold" text-anchor="middle" fill="#333">Approved</text>
+                    <text x="890" y="410" font-size="10" text-anchor="middle" fill="#333">or Rejected</text>
+
+                    <!-- Arrow markers -->
+                    <defs>
+                        <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+                            <polygon points="0 0, 10 3, 0 6" fill="#333" />
+                        </marker>
+                        <marker id="arrowhead-error" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+                            <polygon points="0 0, 10 3, 0 6" fill="#d13438" />
+                        </marker>
+                    </defs>
+                </svg>
+            </div>
+
+            <div class="info-box">
+                <strong>Key Point:</strong> The system performs multiple automatic checks before any human review. Most receipts complete this entire process in seconds to minutes.
+            </div>
+        </section>
+
+        <!-- SECTION C: EXPENSE STATUSES -->
+        <section id="expense-statuses">
+            <h2>C. Explanation of Expense Statuses</h2>
+
+            <p>Your receipt moves through several statuses as it is processed. This table shows each status, what it means, what caused it, and what you should do next.</p>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Status</th>
+                        <th>Meaning</th>
+                        <th>Caused By</th>
+                        <th>Employee Action</th>
+                        <th>Finance Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><span class="status-badge status-processing">UPLOADED</span></td>
+                        <td>Receipt file received</td>
+                        <td>Your upload was successful</td>
+                        <td>Wait for processing</td>
+                        <td>None yet</td>
+                    </tr>
+                    <tr>
+                        <td><span class="status-badge status-processing">HASHING</span></td>
+                        <td>Calculating file fingerprint</td>
+                        <td>System computing SHA-256 hash</td>
+                        <td>Wait for processing</td>
+                        <td>None yet</td>
+                    </tr>
+                    <tr>
+                        <td><span class="status-badge status-processing">QUEUED_FOR_OCR</span></td>
+                        <td>Waiting for text extraction</td>
+                        <td>File is unique; queued for OCR</td>
+                        <td>Wait for processing</td>
+                        <td>None yet</td>
+                    </tr>
+                    <tr>
+                        <td><span class="status-badge status-processing">OCR_PROCESSING</span></td>
+                        <td>Extracting receipt details</td>
+                        <td>Azure Document Intelligence is analyzing your receipt</td>
+                        <td>Wait for processing</td>
+                        <td>None yet</td>
+                    </tr>
+                    <tr>
+                        <td><span class="status-badge status-error">OCR_FAILED</span></td>
+                        <td>Could not read receipt</td>
+                        <td>Receipt image too blurry, damaged, or unreadable</td>
+                        <td>Upload a clearer image or PDF</td>
+                        <td>None; return to employee</td>
+                    </tr>
+                    <tr>
+                        <td><span class="status-badge status-processing">EXTRACTED</span></td>
+                        <td>Receipt information extracted</td>
+                        <td>OCR successfully read the receipt</td>
+                        <td>Wait for category classification</td>
+                        <td>None yet</td>
+                    </tr>
+                    <tr>
+                        <td><span class="status-badge status-processing">NORMALIZED</span></td>
+                        <td>Data formatted for comparison</td>
+                        <td>Receipt data converted to internal format</td>
+                        <td>Wait for duplicate check</td>
+                        <td>None yet</td>
+                    </tr>
+                    <tr>
+                        <td><span class="status-badge status-processing">DUPLICATE_CHECKING</span></td>
+                        <td>Comparing against previous receipts</td>
+                        <td>System checking for similar submissions</td>
+                        <td>Wait for results</td>
+                        <td>None yet</td>
+                    </tr>
+                    <tr>
+                        <td><span class="status-badge status-error">EXACT_DUPLICATE</span></td>
+                        <td>Same file uploaded before</td>
+                        <td>File hash matches a previous receipt</td>
+                        <td>Upload a different receipt or contact Finance</td>
+                        <td>None; notify employee if needed</td>
+                    </tr>
+                    <tr>
+                        <td><span class="status-badge status-error">SEMANTIC_DUPLICATE</span></td>
+                        <td>Same expense submitted before</td>
+                        <td>Merchant, date, and amount match a previous receipt</td>
+                        <td>Contact Finance to clarify if legitimate second submission</td>
+                        <td>Verify if duplicate or if employee has explanation</td>
+                    </tr>
+                    <tr>
+                        <td><span class="status-badge status-success">UNIQUE</span></td>
+                        <td>No duplicate found</td>
+                        <td>Receipt is new and unique</td>
+                        <td>Wait for policy validation</td>
+                        <td>None yet</td>
+                    </tr>
+                    <tr>
+                        <td><span class="status-badge status-processing">POLICY_PROCESSING</span></td>
+                        <td>Validating against company rules</td>
+                        <td>System checking policy compliance</td>
+                        <td>Wait for validation results</td>
+                        <td>None yet</td>
+                    </tr>
+                    <tr>
+                        <td><span class="status-badge status-error">REJECTED</span></td>
+                        <td>Policy validation failed</td>
+                        <td>Receipt violates policy (e.g., too old, category limit exceeded)</td>
+                        <td>Review rejection reason; upload compliant receipt if intended</td>
+                        <td>None; inform employee if appropriate</td>
+                    </tr>
+                    <tr>
+                        <td><span class="status-badge status-pending">NEEDS_REVIEW</span></td>
+                        <td>Awaiting Finance approval</td>
+                        <td>Passed all automatic checks; sent to Finance</td>
+                        <td>Wait for Finance decision</td>
+                        <td>Review receipt and approve or reject</td>
+                    </tr>
+                    <tr>
+                        <td><span class="status-badge status-success">APPROVED</span></td>
+                        <td>Expense approved for reimbursement</td>
+                        <td>Finance team approved the receipt</td>
+                        <td>Reimbursement will be processed per company procedure</td>
+                        <td>None; decision made</td>
+                    </tr>
+                    <tr>
+                        <td><span class="status-badge status-error">FAILED</span></td>
+                        <td>Processing encountered an error</td>
+                        <td>Unexpected technical issue during processing</td>
+                        <td>Contact IT Support; retry upload if instructed</td>
+                        <td>Investigate error; assist employee</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>Understanding Status Transitions</h3>
+
+            <h4>Automatic Processing Statuses</h4>
+            <p>The following statuses occur automatically during system processing and require no action from you:</p>
+            <ul>
+                <li>UPLOADED → HASHING → QUEUED_FOR_OCR → OCR_PROCESSING → EXTRACTED → NORMALIZED → DUPLICATE_CHECKING → POLICY_PROCESSING</li>
+            </ul>
+            <p>These transitions typically complete within seconds to minutes.</p>
+
+            <h4>Final Decision Statuses</h4>
+            <p>Once a receipt reaches any of these statuses, processing stops and no further changes occur unless you contact Finance:</p>
+            <ul>
+                <li>APPROVED (Success - your expense is approved)</li>
+                <li>REJECTED (Final - policy violation or Finance rejection)</li>
+                <li>EXACT_DUPLICATE (Final - re-upload not needed)</li>
+                <li>SEMANTIC_DUPLICATE (Pending - clarification with Finance may resolve)</li>
+                <li>FAILED (Error - requires investigation)</li>
+            </ul>
+
+            <h4>NEEDS_REVIEW Status</h4>
+            <p><strong>Important:</strong> This is NOT a final status. It means Finance is reviewing your receipt. The status will eventually change to APPROVED or REJECTED based on Finance's decision.</p>
+
+            <div class="success-box">
+                <strong>Status Check Tips:</strong>
+                <ul>
+                    <li>Refresh your browser to see the latest status.</li>
+                    <li>Most receipts progress through all statuses automatically within 5-10 minutes.</li>
+                    <li>If a receipt is stuck on NEEDS_REVIEW for more than one business day, contact Finance.</li>
+                    <li>The application displays the reason if a receipt is rejected; read it carefully to understand what went wrong.</li>
+                </ul>
+            </div>
+        </section>
+
+        <!-- SECTION D: FINANCE WORKFLOW -->
+        <section id="finance-workflow">
+            <h2>D. Finance Workflow in Microsoft Teams</h2>
+
+            <h3>Overview for Finance Team Members</h3>
+            <p>
+                Finance team members interact with the Expense Policy Agent through Microsoft Teams. The integration provides a dedicated Finance Dashboard
+                where you can review all pending receipts, view details, and make approval or rejection decisions without leaving Teams.
+            </p>
+
+            <h3>Accessing the Finance Dashboard</h3>
+            <ol>
+                <li>Open Microsoft Teams</li>
+                <li>Navigate to the Expense Policy Agent team or channel</li>
+                <li>Select the "Finance Review" tab (if configured)</li>
+                <li>The Finance Dashboard loads, showing all pending receipts for review</li>
+            </ol>
+
+            <h3>Finance Dashboard Features</h3>
+
+            <h4>Receipt List View</h4>
+            <p>The main dashboard displays a list of all receipts with the following information:</p>
+            <ul>
+                <li><strong>Original Filename:</strong> The receipt document filename uploaded by the employee</li>
+                <li><strong>Merchant/Vendor:</strong> Where the expense occurred (restaurant, hotel, airline, etc.)</li>
+                <li><strong>Transaction Date:</strong> When the purchase was made</li>
+                <li><strong>Amount:</strong> Total expense amount</li>
+                <li><strong>Category:</strong> Expense category assigned (automatically or manually)</li>
+                <li><strong>Status:</strong> Current processing status (should be NEEDS_REVIEW for items in the dashboard)</li>
+                <li><strong>Employee:</strong> Who submitted the receipt</li>
+            </ul>
+
+            <h4>Filtering and Searching</h4>
+            <p>Use filters to narrow down which receipts to review:</p>
+            <ul>
+                <li><strong>By Status:</strong> Filter to show only NEEDS_REVIEW or other statuses</li>
+                <li><strong>By Category:</strong> Show only a specific expense category</li>
+                <li><strong>By Vendor:</strong> Search by merchant name</li>
+                <li><strong>By Date Range:</strong> Show receipts from a specific time period</li>
+                <li><strong>By Amount Range:</strong> Filter high-value or low-value expenses</li>
+            </ul>
+
+            <h3>Reviewing a Receipt</h3>
+
+            <h4>Step 1: Select a Receipt from the List</h4>
+            <p>Click on a receipt in the dashboard to open the review details. An Adaptive Card appears showing:</p>
+            <ul>
+                <li>Receipt filename</li>
+                <li>Extracted merchant and transaction details</li>
+                <li>Calculated amount and currency</li>
+                <li>Assigned category and confidence</li>
+                <li>All extracted line items (if detailed receipt)</li>
+                <li>Employee name who submitted</li>
+            </ul>
+
+            <h4>Step 2: Preview Receipt Image/PDF</h4>
+            <p>Click the "Preview" or "View Receipt" button to open the original receipt file in your browser. This allows you to visually verify that:</p>
+            <ul>
+                <li>The OCR extraction is accurate</li>
+                <li>The merchant and amount are correctly identified</li>
+                <li>The receipt is legitimate and readable</li>
+                <li>No signs of fraud or alteration</li>
+            </ul>
+
+            <h4>Step 3: Verify Policy Compliance</h4>
+            <p>Review whether the receipt complies with company policy:</p>
+            <ul>
+                <li>Is the receipt within 35 days of the transaction date?</li>
+                <li>Does the category have amount limits? Is the expense under the limit?</li>
+                <li>Are there any special rules for this category in your region?</li>
+                <li>Is the employee eligible for reimbursement in this category?</li>
+            </ul>
+
+            <h4>Step 4: Make a Decision</h4>
+            <p>After reviewing, select one of the action buttons in the Adaptive Card:</p>
+
+            <p><strong>Approve Button</strong></p>
+            <ul>
+                <li>Click to approve the expense for reimbursement</li>
+                <li>Receipt status changes to APPROVED</li>
+                <li>Employee is notified of approval</li>
+                <li>Expense proceeds to reimbursement processing per company procedure</li>
+            </ul>
+
+            <p><strong>Reject Button</strong></p>
+            <ul>
+                <li>Click to reject the expense</li>
+                <li>A dialog may appear asking for a rejection reason</li>
+                <li>Enter a brief explanation (e.g., "Exceeds meal limit", "Too old", "Personal expense")</li>
+                <li>Receipt status changes to REJECTED</li>
+                <li>Employee sees the rejection and reason in their receipt history</li>
+            </ul>
+
+            <div class="warning-box">
+                <strong>Important:</strong> Once you approve or reject a receipt, the decision is recorded in the audit trail. You cannot undo a decision, so verify the receipt carefully before clicking either button.
+            </div>
+
+            <h3>Finance Dashboard Workflow Diagram</h3>
+            <div class="diagram">
+                <svg viewBox="0 0 900 500" xmlns="http://www.w3.org/2000/svg">
+                    <!-- Title -->
+                    <text x="450" y="30" font-size="24" font-weight="bold" text-anchor="middle" fill="#0078d4">Finance Team Workflow in Teams</text>
+
+                    <!-- Step 1 -->
+                    <rect x="50" y="80" width="150" height="60" fill="#e8f4f8" stroke="#0078d4" stroke-width="2" rx="5"/>
+                    <text x="125" y="110" font-size="12" font-weight="bold" text-anchor="middle" fill="#333">Open Finance</text>
+                    <text x="125" y="130" font-size="11" text-anchor="middle" fill="#333">Dashboard in Teams</text>
+
+                    <!-- Arrow -->
+                    <line x1="200" y1="110" x2="250" y2="110" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+                    <!-- Step 2 -->
+                    <rect x="250" y="80" width="150" height="60" fill="#e8f4f8" stroke="#0078d4" stroke-width="2" rx="5"/>
+                    <text x="325" y="110" font-size="12" font-weight="bold" text-anchor="middle" fill="#333">View Pending</text>
+                    <text x="325" y="130" font-size="11" text-anchor="middle" fill="#333">Receipts List</text>
+
+                    <!-- Arrow -->
+                    <line x1="400" y1="110" x2="450" y2="110" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+                    <!-- Step 3 -->
+                    <rect x="450" y="80" width="150" height="60" fill="#e8f4f8" stroke="#0078d4" stroke-width="2" rx="5"/>
+                    <text x="525" y="110" font-size="12" font-weight="bold" text-anchor="middle" fill="#333">Select Receipt</text>
+                    <text x="525" y="130" font-size="11" text-anchor="middle" fill="#333">View Details</text>
+
+                    <!-- Arrow -->
+                    <line x1="600" y1="110" x2="650" y2="110" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+                    <!-- Step 4 -->
+                    <rect x="650" y="80" width="200" height="60" fill="#fef3cd" stroke="#ffb900" stroke-width="2" rx="5"/>
+                    <text x="750" y="110" font-size="12" font-weight="bold" text-anchor="middle" fill="#333">Preview Receipt</text>
+                    <text x="750" y="130" font-size="11" text-anchor="middle" fill="#333">Verify Extraction</text>
+
+                    <!-- Arrow down -->
+                    <line x1="750" y1="140" x2="750" y2="180" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+                    <!-- Step 5 -->
+                    <rect x="650" y="180" width="200" height="60" fill="#fef3cd" stroke="#ffb900" stroke-width="2" rx="5"/>
+                    <text x="750" y="210" font-size="12" font-weight="bold" text-anchor="middle" fill="#333">Check Policy</text>
+                    <text x="750" y="230" font-size="11" text-anchor="middle" fill="#333">Compliance</text>
+
+                    <!-- Arrow down -->
+                    <line x1="750" y1="240" x2="750" y2="280" stroke="#333" stroke-width="2" marker-end="url(#arrowhead)"/>
+
+                    <!-- Decision point -->
+                    <polygon points="750,280 850,330 750,380 650,330" fill="#fef3cd" stroke="#ffb900" stroke-width="2"/>
+                    <text x="750" y="335" font-size="12" font-weight="bold" text-anchor="middle" fill="#333">Decision</text>
+
+                    <!-- Left path: Approve -->
+                    <line x1="650" y1="330" x2="550" y2="330" stroke="#107c10" stroke-width="2" marker-end="url(#arrowhead-approve)"/>
+                    <text x="580" y="325" font-size="10" fill="#107c10" font-weight="bold">Approve</text>
+
+                    <rect x="350" y="300" width="150" height="60" fill="#d4edda" stroke="#107c10" stroke-width="2" rx="5"/>
+                    <text x="425" y="330" font-size="12" font-weight="bold" text-anchor="middle" fill="#333">Status:</text>
+                    <text x="425" y="350" font-size="11" text-anchor="middle" fill="#333">APPROVED</text>
+
+                    <!-- Right path: Reject -->
+                    <line x1="850" y1="330" x2="950" y2="330" stroke="#d13438" stroke-width="2" marker-end="url(#arrowhead-reject)"/>
+                    <text x="895" y="325" font-size="10" fill="#d13438" font-weight="bold">Reject</text>
+
+                    <rect x="950" y="300" width="150" height="60" fill="#f8d7da" stroke="#d13438" stroke-width="2" rx="5"/>
+                    <text x="1025" y="330" font-size="12" font-weight="bold" text-anchor="middle" fill="#333">Status:</text>
+                    <text x="1025" y="350" font-size="11" text-anchor="middle" fill="#333">REJECTED</text>
+
+                    <!-- Arrow markers -->
+                    <defs>
+                        <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+                            <polygon points="0 0, 10 3, 0 6" fill="#333" />
+                        </marker>
+                        <marker id="arrowhead-approve" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+                            <polygon points="0 0, 10 3, 0 6" fill="#107c10" />
+                        </marker>
+                        <marker id="arrowhead-reject" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+                            <polygon points="0 0, 10 3, 0 6" fill="#d13438" />
+                        </marker>
+                    </defs>
+
+                    <!-- Note box -->
+                    <rect x="50" y="420" width="1000" height="60" fill="#e8f4f8" stroke="#0078d4" stroke-width="1" rx="5"/>
+                    <text x="550" y="445" font-size="11" text-anchor="middle" fill="#333" font-weight="bold">Employee sees updated status immediately • Decisions recorded in audit trail • No undo available</text>
+                </svg>
+            </div>
+
+            <h3>Common Finance Scenarios</h3>
+
+            <h4>Scenario: Expense Exceeds Category Limit</h4>
+            <p>You see a lunch receipt for $50, but the category limit for "Food: Lunch" is $15.</p>
+            <ul>
+                <li><strong>Policy status:</strong> The system should have already rejected this (status: REJECTED)</li>
+                <li><strong>If it reached you:</strong> The system incorrectly calculated or the receipt is mislabeled</li>
+                <li><strong>Action:</strong> Reject with reason "Exceeds meal category limit"</li>
+            </ul>
+
+            <h4>Scenario: Receipt Seems Fraudulent</h4>
+            <p>A receipt appears altered or suspicious (smudged amounts, inconsistent fonts).</p>
+            <ul>
+                <li><strong>Action:</strong> Reject with reason "Receipt appears altered or suspicious; requires employee clarification"</li>
+                <li><strong>Follow-up:</strong> Contact the employee if your company protocol requires</li>
+            </ul>
+
+            <h4>Scenario: Receipt Is Legitimate but Policy-Exempt</h4>
+            <p>A receipt might violate policy but has special approval (e.g., client entertainment, exception approval).</p>
+            <ul>
+                <li><strong>Action:</strong> If authorized, approve with internal note</li>
+                <li><strong>Coordination:</strong> Ensure special approval is documented separately if required</li>
+            </ul>
+        </section>
+
+        <!-- SECTION E: COMMON SCENARIOS -->
+        <section id="scenarios">
+            <h2>E. Common Scenarios and Troubleshooting</h2>
+
+            <div class="scenario-box">
+                <h4>Scenario 1: Receipt Uploads Successfully</h4>
+                <p><strong>What you see:</strong> "Processing..." status, then status changes through automatic checks.</p>
+                <p><strong>What's happening:</strong> System checks for exact duplicate, performs OCR, classifies category, checks for semantic duplicate, validates policy.</p>
+                <p><strong>Next step:</strong> Monitor status. If final status is APPROVED or REJECTED, check your receipt history.</p>
+            </div>
+
+            <div class="scenario-box">
+                <h4>Scenario 2: System Cannot Determine Category</h4>
+                <p><strong>What you see:</strong> Prompt asking you to select expense category manually.</p>
+                <p><strong>Why:</strong> The system's confidence in auto-classification was below threshold (< 75%).</p>
+                <p><strong>What to do:</strong> Select the most appropriate category from the list provided. If unsure, ask your manager or Finance team.</p>
+            </div>
+
+            <div class="scenario-box">
+                <h4>Scenario 3: Receipt Information Missing</h4>
+                <p><strong>What you see:</strong> Status FAILED with message "Document does not appear to be a valid receipt."</p>
+                <p><strong>Why:</strong> OCR extraction failed or extracted incomplete data (missing merchant, total, or required fields).</p>
+                <p><strong>What to do:</strong> Upload a different receipt or a clearer image/PDF of the same receipt. Ensure:
+                    <ul>
+                        <li>Receipt is not too blurry or faded</li>
+                        <li>Merchant name is clearly visible</li>
+                        <li>Total amount is legible</li>
+                        <li>Date is readable</li>
+                    </ul>
+                </p>
+            </div>
+
+            <div class="scenario-box">
+                <h4>Scenario 4: Duplicate Detected</h4>
+                <p><strong>What you see:</strong> Status EXACT_DUPLICATE or SEMANTIC_DUPLICATE with message indicating duplicate found.</p>
+                <p><strong>Why:</strong> File is identical to a previous upload, or receipt details match a previous submission closely.</p>
+                <p><strong>What to do:</strong>
+                    <ul>
+                        <li><strong>Exact Duplicate:</strong> Do not re-upload the same file. Contact Finance if you believe it's an error.</li>
+                        <li><strong>Semantic Duplicate:</strong> Contact Finance to explain if this is a legitimate second submission (e.g., different trip leg, duplicate receipt issued).</li>
+                    </ul>
+                </p>
+            </div>
+
+            <div class="scenario-box">
+                <h4>Scenario 5: Policy Validation Fails</h4>
+                <p><strong>What you see:</strong> Status REJECTED with message like "Receipt is older than 35 days" or "Exceeds meal limit."</p>
+                <p><strong>Why:</strong> Receipt violates company expense policy.</p>
+                <p><strong>What to do:</strong> Read the rejection reason carefully.
+                    <ul>
+                        <li>If policy is strict, contact your manager or Finance for possible exception.</li>
+                        <li>If mislabeled, try uploading again with correct category.</li>
+                        <li>If receipt date was entered wrong, contact Finance to update.</li>
+                    </ul>
+                </p>
+            </div>
+
+            <div class="scenario-box">
+                <h4>Scenario 6: Expense Awaits Finance Review</h4>
+                <p><strong>What you see:</strong> Status NEEDS_REVIEW for more than a few minutes.</p>
+                <p><strong>Why:</strong> Receipt passed all automatic checks and is in the Finance team's review queue.</p>
+                <p><strong>What to do:</strong>
+                    <ul>
+                        <li>Wait for Finance to review (typically 1-3 business days)</li>
+                        <li>Status will update to APPROVED or REJECTED</li>
+                        <li>If waiting longer than expected, contact Finance directly</li>
+                    </ul>
+                </p>
+            </div>
+
+            <div class="scenario-box">
+                <h4>Scenario 7: Finance Approves Expense</h4>
+                <p><strong>What you see:</strong> Status APPROVED with confirmation message.</p>
+                <p><strong>What this means:</strong> Finance team has approved your expense for reimbursement.</p>
+                <p><strong>Next step:</strong> Reimbursement will be processed according to your company's payment procedure (direct deposit, check, etc.).</p>
+            </div>
+
+            <div class="scenario-box">
+                <h4>Scenario 8: Finance Rejects Expense</h4>
+                <p><strong>What you see:</strong> Status REJECTED with reason provided (e.g., "Personal expense", "Incomplete receipt", "Exceeded limit").</p>
+                <p><strong>What to do:</strong>
+                    <ul>
+                        <li>Read the rejection reason carefully</li>
+                        <li>If you believe it's an error, contact Finance with clarification</li>
+                        <li>If legitimate, you may absorb the expense or request manager approval</li>
+                    </ul>
+                </p>
+            </div>
+
+            <div class="scenario-box">
+                <h4>Scenario 9: Application Page Fails to Load</h4>
+                <p><strong>What you see:</strong> Error message or blank page when opening receipt upload or history.</p>
+                <p><strong>What to do:</strong>
+                    <ul>
+                        <li>Refresh your browser (Ctrl+R or Cmd+R)</li>
+                        <li>Clear browser cache if refresh doesn't help</li>
+                        <li>Try a different browser or device</li>
+                        <li>Check your internet connection</li>
+                        <li>If still failing, contact IT Support with error message/screenshot</li>
+                    </ul>
+                </p>
+            </div>
+
+            <div class="scenario-box">
+                <h4>Scenario 10: Azure Storage Temporarily Unavailable</h4>
+                <p><strong>What you see:</strong> Error uploading receipt, or status stuck on "UPLOADING" for extended time.</p>
+                <p><strong>Why:</strong> Brief cloud service outage or network connectivity issue.</p>
+                <p><strong>What to do:</strong>
+                    <ul>
+                        <li>Wait a few minutes and try again</li>
+                        <li>If problem persists, contact IT Support</li>
+                        <li>Keep the receipt available for later upload</li>
+                    </ul>
+                </p>
+            </div>
+        </section>
+
+        <!-- SECTION F: FAQ -->
+        <section id="faq">
+            <h2>F. Frequently Asked Questions</h2>
+
+            <div class="faq-item">
+                <div class="faq-question">Q: How do I upload a receipt?</div>
+                <p>
+                    Log into the Expense Policy Agent, click "Upload Receipt", select a PDF or image file (JPG/PNG), and submit.
+                    The file must be under 10 MB. The system will confirm receipt and begin processing automatically.
+                </p>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question">Q: What file formats are supported?</div>
+                <p>
+                    PDF (.pdf), JPEG (.jpg, .jpeg), and PNG (.png) are supported.
+                    If your receipt is in another format (e.g., screenshot as a WebP), save or convert it to one of the supported formats first.
+                </p>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question">Q: How do I know whether my receipt was processed?</div>
+                <p>
+                    Open your receipt history to see all submitted receipts and their statuses. The status updates automatically as processing progresses.
+                    Most receipts complete all checks within 5-10 minutes.
+                </p>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question">Q: What does my expense status mean?</div>
+                <p>
+                    See Section C (Expense Statuses) for a complete table explaining each status, what caused it, and what you should do.
+                    Quickly: APPROVED = done and approved; REJECTED = not approved; NEEDS_REVIEW = waiting for Finance; others are intermediate processing states.
+                </p>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question">Q: Why might I need to select a category manually?</div>
+                <p>
+                    The system uses keyword and semantic analysis to auto-classify receipts. If confidence is low (< 75%), it asks you to select manually.
+                    This ensures accuracy. Choose the category that best describes your expense. When in doubt, ask your manager.
+                </p>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question">Q: What happens if a duplicate is detected?</div>
+                <p>
+                    <strong>Exact Duplicate:</strong> Your file is identical to one uploaded before. Do not re-upload the same file; contact Finance if it's an error.
+                    <strong>Semantic Duplicate:</strong> Your receipt details closely match a previous submission. Contact Finance if it's a legitimate separate expense (e.g., different trip).
+                </p>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question">Q: How can I tell whether Finance has reviewed my expense?</div>
+                <p>
+                    If your status is APPROVED or REJECTED, Finance has completed review. APPROVED means it's approved for reimbursement.
+                    REJECTED means Finance did not approve; read the reason for details. NEEDS_REVIEW means Finance is still reviewing.
+                </p>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question">Q: How does a Finance user approve or reject an expense in Teams?</div>
+                <p>
+                    Finance opens the Finance Dashboard in Teams, selects a pending receipt, views the details and receipt preview, and clicks either the Approve or Reject button.
+                    Approvals are immediate; rejections may include a brief reason.
+                </p>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question">Q: Can I upload multiple receipts at once?</div>
+                <p>
+                    Upload receipts one at a time through the application. Each receipt is processed independently.
+                    You can upload your next receipt while the previous one is processing.
+                </p>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question">Q: What if I uploaded the wrong file by mistake?</div>
+                <p>
+                    If processing has not completed, contact Finance immediately to prevent it from being reviewed.
+                    If processing is complete and receipt is rejected, simply do not resubmit it. If processing is complete and receipt is approved, contact Finance to discuss if cancellation is possible.
+                </p>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question">Q: How long does receipt processing take?</div>
+                <p>
+                    Automatic checks (extraction, duplicate detection, policy validation) typically complete in 5-10 minutes.
+                    Finance review (NEEDS_REVIEW status) typically takes 1-3 business days depending on volume.
+                </p>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question">Q: What should I do if receipt processing fails?</div>
+                <p>
+                    If status shows FAILED or OCR_FAILED, the receipt image was too blurry or unreadable.
+                    Try uploading a clearer image or PDF version. Ensure the receipt file is legible and in good condition.
+                </p>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question">Q: Where can I get help if something goes wrong?</div>
+                <p>
+                    Contact your Finance department or IT Support. Provide your receipt ID (shown in receipt history) and the status message so they can investigate.
+                </p>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question">Q: Is my receipt data secure?</div>
+                <p>
+                    Yes. Receipt files are stored in encrypted cloud storage (Azure Blob Storage). Extracted data is stored in a secure database.
+                    Access is restricted to authorized Finance team members. Data is not shared with external parties.
+                </p>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question">Q: Can I delete a receipt from history?</div>
+                <p>
+                    Receipts are retained permanently for audit and compliance purposes. You cannot delete a receipt.
+                    If you believe a receipt should not have been approved, contact Finance immediately.
+                </p>
+            </div>
+
+            <div class="faq-item">
+                <div class="faq-question">Q: What happens if I reject a Finance approval decision?</div>
+                <p>
+                    You cannot reject a Finance decision. Once Finance approves or rejects, the decision is final and recorded in the audit trail.
+                    If you believe the decision is incorrect, contact Finance directly to discuss.
+                </p>
+            </div>
+        </section>
+
+        <!-- SECTION G: QUICK REFERENCE -->
+        <section id="quick-reference">
+            <h2>G. Quick Reference</h2>
+
+            <h3>Employee Quick Reference (1-Page Summary)</h3>
+            <div class="quick-ref">
+                <h4>How to Upload a Receipt (Quick Steps)</h4>
+                <ol>
+                    <li>Log in to Expense Policy Agent</li>
+                    <li>Click "Upload Receipt"</li>
+                    <li>Select PDF or JPG/PNG file (max 10 MB)</li>
+                    <li>Submit → system confirms receipt</li>
+                    <li>Wait for automatic processing (5-10 min typically)</li>
+                    <li>If prompted, select expense category</li>
+                    <li>Status shows automatic checks results</li>
+                    <li>If NEEDS_REVIEW: Finance is reviewing (1-3 days)</li>
+                    <li>Final status: APPROVED or REJECTED</li>
+                </ol>
+
+                <h4>What to Do If Status Is...</h4>
+                <ul>
+                    <li><strong>UPLOADED, HASHING, QUEUED, OCR_PROCESSING:</strong> Wait for processing</li>
+                    <li><strong>OCR_FAILED, FAILED:</strong> Upload a clearer receipt image</li>
+                    <li><strong>EXACT_DUPLICATE:</strong> Do not re-upload; contact Finance if error</li>
+                    <li><strong>SEMANTIC_DUPLICATE:</strong> Contact Finance if legitimate separate expense</li>
+                    <li><strong>REJECTED (policy):</strong> Read reason; upload compliant receipt or contact manager</li>
+                    <li><strong>NEEDS_REVIEW:</strong> Wait for Finance (1-3 business days)</li>
+                    <li><strong>APPROVED:</strong> Done! Reimbursement will be processed</li>
+                    <li><strong>REJECTED (Finance):</strong> Read reason; contact Finance if you disagree</li>
+                </ul>
+
+                <h4>Supported Receipt Formats</h4>
+                <ul>
+                    <li>PDF (.pdf) - Good for email receipts</li>
+                    <li>JPEG (.jpg, .jpeg) - Good for photos</li>
+                    <li>PNG (.png) - Good for screenshots</li>
+                    <li>Max size: 10 MB per file</li>
+                </ul>
+
+                <h4>Contact Finance If...</h4>
+                <ul>
+                    <li>Receipt shows FAILED or OCR_FAILED after retrying</li>
+                    <li>Status is EXACT_DUPLICATE or SEMANTIC_DUPLICATE and you believe it's an error</li>
+                    <li>Policy rejection doesn't make sense</li>
+                    <li>Receipt is stuck in NEEDS_REVIEW for > 1 business day</li>
+                    <li>You need to dispute a rejection</li>
+                    <li>Application page won't load</li>
+                </ul>
+            </div>
+
+            <h3>Finance Quick Reference (1-Page Summary)</h3>
+            <div class="quick-ref">
+                <h4>Finance Review Workflow (Quick Steps)</h4>
+                <ol>
+                    <li>Open Teams and go to Finance Dashboard tab</li>
+                    <li>View list of NEEDS_REVIEW receipts (pending your decision)</li>
+                    <li>Click a receipt to open details card</li>
+                    <li>Click "Preview" to view the actual receipt image/PDF</li>
+                    <li>Verify extraction accuracy and policy compliance</li>
+                    <li>Click "Approve" to approve for reimbursement</li>
+                    <li>Click "Reject" to reject; provide brief reason if required</li>
+                    <li>Status updates immediately; decision recorded in audit</li>
+                </ol>
+
+                <h4>What Each Status Means for Finance</h4>
+                <ul>
+                    <li><strong>NEEDS_REVIEW:</strong> Passed auto-checks; awaiting YOUR review and decision</li>
+                    <li><strong>APPROVED:</strong> You or another Finance user approved; no further action</li>
+                    <li><strong>REJECTED:</strong> You or another Finance user rejected; no further action</li>
+                    <li><strong>EXACT_DUPLICATE, SEMANTIC_DUPLICATE:</strong> Auto-detected duplicate; may notify employee</li>
+                    <li><strong>REJECTED (policy):</strong> Failed policy validation; auto-rejected; no Finance review needed</li>
+                    <li><strong>FAILED, OCR_FAILED:</strong> Processing error; employee must retry or clarify</li>
+                </ul>
+
+                <h4>Finance Review Checklist</h4>
+                <ul>
+                    <li>☑ Is the OCR extraction accurate? (Check preview vs. fields)</li>
+                    <li>☑ Is the merchant/vendor name correct?</li>
+                    <li>☑ Is the amount and currency correct?</li>
+                    <li>☑ Is the transaction date within policy (≤ 35 days)?</li>
+                    <li>☑ Does category match the receipt content?</li>
+                    <li>☑ Are there any category-specific limits? (meals, mileage, etc.)</li>
+                    <li>☑ Is there any sign of fraud or alteration?</li>
+                    <li>☑ Is the employee eligible for this expense type?</li>
+                    <li>☑ Ready to approve or reject?</li>
+                </ul>
+
+                <h4>Common Rejection Reasons (Examples)</h4>
+                <ul>
+                    <li>Exceeds [category] limit</li>
+                    <li>Personal expense; not business-related</li>
+                    <li>Receipt is too old (> 35 days)</li>
+                    <li>Incomplete or unclear receipt; need clarification</li>
+                    <li>Employee not eligible for this category</li>
+                    <li>Receipt appears fraudulent or altered</li>
+                </ul>
+
+                <h4>Important Notes</h4>
+                <ul>
+                    <li>All decisions are final and recorded in audit trail (no undo)</li>
+                    <li>Approved receipts proceed to reimbursement automatically</li>
+                    <li>Rejected receipts notify employee; they can appeal or clarify</li>
+                    <li>Filtering and searching help manage high volume</li>
+                </ul>
+            </div>
+
+            <h3>Expense Status Reference Table</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Status</th>
+                        <th>Status Type</th>
+                        <th>Employee Sees</th>
+                        <th>Finance Sees</th>
+                        <th>Can Change?</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>UPLOADED, HASHING, QUEUED_FOR_OCR</td>
+                        <td>Automatic</td>
+                        <td>Processing</td>
+                        <td>Not visible</td>
+                        <td>No</td>
+                    </tr>
+                    <tr>
+                        <td>OCR_PROCESSING, EXTRACTED, NORMALIZED</td>
+                        <td>Automatic</td>
+                        <td>Processing</td>
+                        <td>Not visible</td>
+                        <td>No</td>
+                    </tr>
+                    <tr>
+                        <td>DUPLICATE_CHECKING, UNIQUE</td>
+                        <td>Automatic</td>
+                        <td>Processing</td>
+                        <td>Not visible</td>
+                        <td>No</td>
+                    </tr>
+                    <tr>
+                        <td>POLICY_PROCESSING</td>
+                        <td>Automatic</td>
+                        <td>Processing</td>
+                        <td>Not visible</td>
+                        <td>No</td>
+                    </tr>
+                    <tr>
+                        <td>EXACT_DUPLICATE</td>
+                        <td>Final</td>
+                        <td>Rejected (duplicate)</td>
+                        <td>Not reviewed</td>
+                        <td>No</td>
+                    </tr>
+                    <tr>
+                        <td>SEMANTIC_DUPLICATE</td>
+                        <td>Final</td>
+                        <td>Pending (duplicate)</td>
+                        <td>May review if employee clarifies</td>
+                        <td>Via employee clarification</td>
+                    </tr>
+                    <tr>
+                        <td>REJECTED (policy)</td>
+                        <td>Final</td>
+                        <td>Rejected</td>
+                        <td>Not reviewed</td>
+                        <td>No (unless employee resubmits)</td>
+                    </tr>
+                    <tr>
+                        <td>OCR_FAILED, FAILED</td>
+                        <td>Final</td>
+                        <td>Failed</td>
+                        <td>Not reviewed</td>
+                        <td>No (employee must retry)</td>
+                    </tr>
+                    <tr>
+                        <td>NEEDS_REVIEW</td>
+                        <td>Human Decision</td>
+                        <td>Awaiting review</td>
+                        <td>Ready for review</td>
+                        <td>Yes (Approve/Reject)</td>
+                    </tr>
+                    <tr>
+                        <td>APPROVED</td>
+                        <td>Final</td>
+                        <td>Approved</td>
+                        <td>Completed</td>
+                        <td>No</td>
+                    </tr>
+                    <tr>
+                        <td>REJECTED</td>
+                        <td>Final</td>
+                        <td>Rejected</td>
+                        <td>Completed</td>
+                        <td>No</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>Glossary</h3>
+            <div class="glossary-term">
+                <dt>OCR (Optical Character Recognition)</dt>
+                <dd>Technology that reads images and extracts text and data. Used to automatically pull merchant name, amount, date, and other information from receipt images.</dd>
+            </div>
+
+            <div class="glossary-term">
+                <dt>Azure Document Intelligence</dt>
+                <dd>Microsoft's cloud service that analyzes documents (receipts, invoices) and extracts structured data automatically. This is the OCR system used by Expense Policy Agent.</dd>
+            </div>
+
+            <div class="glossary-term">
+                <dt>Azure Blob Storage</dt>
+                <dd>Microsoft's secure cloud file storage service. Original receipt files are stored here for archiving and audit purposes.</dd>
+            </div>
+
+            <div class="glossary-term">
+                <dt>SHA-256 Hash / File Fingerprint</dt>
+                <dd>A unique identifier calculated from a file's content. Two files with identical content will have the same hash, even if named differently. Used to detect exact duplicates.</dd>
+            </div>
+
+            <div class="glossary-term">
+                <dt>Semantic Duplicate</dt>
+                <dd>A receipt that may be a duplicate based on matching merchant, date, and amount—even though the file is different. Examples: rescanned receipt, screenshot vs. PDF, compressed image version.</dd>
+            </div>
+
+            <div class="glossary-term">
+                <dt>Exact Duplicate</dt>
+                <dd>A receipt file that is bit-for-bit identical to a previously uploaded receipt. Same file, different upload attempt.</dd>
+            </div>
+
+            <div class="glossary-term">
+                <dt>Policy Validation</dt>
+                <dd>Automatic check to ensure receipt complies with company expense rules (e.g., age limit, category limits). Receipts failing this check are auto-rejected.</dd>
+            </div>
+
+            <div class="glossary-term">
+                <dt>Adaptive Card</dt>
+                <dd>A rich interactive message format used in Microsoft Teams. Displays receipt information and action buttons (Approve/Reject) in the Finance Dashboard.</dd>
+            </div>
+
+            <div class="glossary-term">
+                <dt>Finance Dashboard</dt>
+                <dd>A Teams tab that shows Finance team members all pending receipts (NEEDS_REVIEW status) with options to approve or reject.</dd>
+            </div>
+
+            <div class="glossary-term">
+                <dt>Expense Category</dt>
+                <dd>A classification of what type of business expense this is (e.g., Transport: Taxis, Food: Lunch, Accommodation). Used for policy validation and reporting.</dd>
+            </div>
+
+            <div class="glossary-term">
+                <dt>Confidence Score</dt>
+                <dd>A percentage (0-100%) indicating how confident the system is in its automatic category classification. High confidence (≥ 75%) auto-assigns the category. Low confidence (< 75%) prompts manual selection.</dd>
+            </div>
+
+            <div class="glossary-term">
+                <dt>Audit Trail</dt>
+                <dd>A permanent record of all actions taken on a receipt: who uploaded it, when, what decisions were made, who made them, and when. Cannot be modified or deleted.</dd>
+            </div>
+        </section>
+
+        <footer>
+            <p><strong>Expense Policy Agent - User Manual</strong></p>
+            <p>Version 1.0 | Last Updated: October 2026</p>
+            <p>For questions or technical support, contact your Finance department or IT Support</p>
+            <p style="margin-top: 20px; font-size: 0.85em;">This manual is confidential company documentation. Do not share outside your organization.</p>
+        </footer>
+    </div>
+</body>
+</html>

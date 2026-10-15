@@ -28,6 +28,11 @@ class Config:
         "DJANGO_FINANCE_API_URL", "http://localhost:8000/finance/api"
     )
 
+    # User Manual
+    PUBLIC_FRONTEND_URL: str = os.getenv(
+        "PUBLIC_FRONTEND_URL", "http://localhost:5173"
+    )
+
     # Feature Flags
     SKIP_TEAMS_AUTH: bool = os.getenv("SKIP_TEAMS_AUTH", "False").lower() == "true"
     DEBUG: bool = os.getenv("DEBUG", "False").lower() == "true"
