@@ -313,12 +313,8 @@ class ReceiptViewSet(viewsets.ReadOnlyModelViewSet):
 
                 logger.info(f"[DELETE_SUCCESS] receipt_id={receipt_id}, blob_name={blob_name}")
 
+                # HTTP 204 No Content must have empty body - return empty Response
                 return Response(
-                    {
-                        'success': True,
-                        'message': 'Receipt deleted successfully',
-                        'receipt_id': str(receipt_id)
-                    },
                     status=status.HTTP_204_NO_CONTENT
                 )
 

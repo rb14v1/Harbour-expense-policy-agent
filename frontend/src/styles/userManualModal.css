@@ -83,14 +83,14 @@
 
 .manual-modal-content {
   flex: 1;
-  overflow: auto;
+  overflow: hidden;
   display: flex;
-  align-items: center;
-  justify-content: center;
+  flex-direction: column;
   position: relative;
 }
 
 .manual-loading {
+  flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -116,6 +116,7 @@
 }
 
 .manual-error {
+  flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -155,10 +156,11 @@
 }
 
 .manual-html-content {
+  flex: 1;
   width: 100%;
-  height: 100%;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .manual-iframe {
