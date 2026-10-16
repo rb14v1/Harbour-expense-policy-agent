@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import '../styles/userManualModal.css';
 
 interface UserManualModalProps {
@@ -18,6 +18,8 @@ export default function UserManualModal({
   onClose,
   onRetry,
 }: UserManualModalProps) {
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+
   useEffect(() => {
     const handleEscapeKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isOpen) {
@@ -35,6 +37,40 @@ export default function UserManualModal({
       document.body.style.overflow = 'unset';
     };
   }, [isOpen, onClose]);
+
+  useEffect(() => {
+    if (!iframeRef.current || !content) return;
+
+    const iframe = iframeRef.current;
+    const handleIframeLoad = () => {
+      try {
+        const iframeDoc = iframe.contentDocument;
+        if (!iframeDoc) return;
+
+        const links = iframeDoc.querySelectorAll('a[href^="#"]');
+        links.forEach(link => {
+          link.addEventListener('click', (e: Event) => {
+            e.preventDefault();
+            const href = (link as HTMLAnchorElement).getAttribute('href');
+            if (href && href.startsWith('#')) {
+              const targetId = href.substring(1);
+              const target = iframeDoc.getElementById(targetId);
+              if (target) {
+                target.scrollIntoView({ behavior: 'smooth' });
+              }
+            }
+          });
+        });
+      } catch (err) {
+        console.error('Failed to setup iframe anchor links:', err);
+      }
+    };
+
+    iframe.addEventListener('load', handleIframeLoad);
+    return () => {
+      iframe.removeEventListener('load', handleIframeLoad);
+    };
+  }, [content]);
 
   if (!isOpen) return null;
 
@@ -79,6 +115,7 @@ export default function UserManualModal({
           {content && !isLoading && !error && (
             <div className="manual-html-content">
               <iframe
+                ref={iframeRef}
                 srcDoc={content}
                 title="User Manual"
                 className="manual-iframe"

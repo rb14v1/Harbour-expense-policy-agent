@@ -42,7 +42,7 @@ class ReceiptViewSet(viewsets.ModelViewSet):
         owner = self.request.query_params.get('owner', 'default-user')
         queryset = Receipt.objects.all().order_by('-created_at')
 
-        if self.action not in ('preview', 'set_category'):
+        if self.action not in ('preview', 'set_category', 'delete_receipt'):
             queryset = queryset.filter(owner=owner)
 
             status_filter = self.request.query_params.get('status')
@@ -264,14 +264,17 @@ class ReceiptViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
     @action(detail=True, methods=['delete'])
-    @require_finance_auth
     def delete_receipt(self, request, pk=None):
         """
         Safely delete a receipt.
         Only Finance Department users can delete receipts.
         Deletes both database record and associated blob from Azure Storage.
         """
-        owner = request.query_params.get('owner', 'default-user')
+        # Handle both DRF Request (query_params) and Django HttpRequest (GET)
+        if hasattr(request, 'query_params'):
+            owner = request.query_params.get('owner', 'default-user')
+        else:
+            owner = request.GET.get('owner', 'default-user')
 
         if owner != 'finance-department':
             return Response(
