@@ -422,7 +422,7 @@ export default function FinanceDashboard() {
 
       {/* Delete Confirmation Dialog */}
       {showDeleteConfirm && selectedReceipt && (
-        <div className="modal-overlay" onClick={() => !deleting && setShowDeleteConfirm(false)}>
+        <div className="modal-overlay" onClick={() => !deleting && setShowDeleteConfirm(false)} style={{ zIndex: 1001 }}>
           <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '500px' }}>
             <div className="modal-header">
               <h2>Confirm Delete Receipt</h2>
