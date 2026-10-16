@@ -35,6 +35,8 @@ export default function FinanceDashboard() {
   const [selectedReceipt, setSelectedReceipt] = useState<ReceiptDetail | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [deciding, setDeciding] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
   const { state: manualState, open: openManual, close: closeManual, retry: retryManual } = useUserManual();
 
@@ -123,6 +125,41 @@ export default function FinanceDashboard() {
       setError(errMsg);
     } finally {
       setDeciding(false);
+    }
+  };
+
+  const handleDeleteReceipt = async () => {
+    if (!selectedReceipt) return;
+
+    setDeleting(true);
+    try {
+      const response = await fetch(`/api/v1/receipts/${selectedReceipt.id}/delete_receipt/?owner=finance-department`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.status === 204) {
+        setShowModal(false);
+        setSelectedReceipt(null);
+        setShowDeleteConfirm(false);
+        setError(null);
+        // Reload receipts to reflect deletion
+        await loadReceipts(filters);
+      } else if (response.status === 404) {
+        setError('Receipt not found');
+      } else if (response.status === 403) {
+        setError('Unauthorized to delete receipt');
+      } else {
+        const data = await response.json();
+        setError(data.error || 'Failed to delete receipt');
+      }
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : 'Failed to delete receipt';
+      setError(errMsg);
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -383,13 +420,71 @@ export default function FinanceDashboard() {
         </div>
       </div>
 
+      {/* Delete Confirmation Dialog */}
+      {showDeleteConfirm && selectedReceipt && (
+        <div className="modal-overlay" onClick={() => !deleting && setShowDeleteConfirm(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '500px' }}>
+            <div className="modal-header">
+              <h2>Confirm Delete Receipt</h2>
+              <button className="modal-close" onClick={() => !deleting && setShowDeleteConfirm(false)}>×</button>
+            </div>
+
+            <div className="modal-content">
+              <div className="modal-section">
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <p style={{ marginBottom: '1rem', fontWeight: 'bold' }}>
+                    Are you sure you want to delete this receipt?
+                  </p>
+                  <div style={{ padding: '1rem', backgroundColor: '#fef3cd', borderRadius: '4px', marginBottom: '1rem' }}>
+                    <p style={{ marginBottom: '0.5rem' }}>
+                      <strong>Vendor:</strong> {selectedReceipt.vendor_name || 'Unknown'}
+                    </p>
+                    <p style={{ marginBottom: '0.5rem' }}>
+                      <strong>Amount:</strong> {selectedReceipt.currency || 'N/A'} {selectedReceipt.total_amount ? selectedReceipt.total_amount.toFixed(2) : '0.00'}
+                    </p>
+                    <p style={{ marginBottom: '0.5rem' }}>
+                      <strong>Date:</strong> {selectedReceipt.transaction_date
+                        ? new Date(selectedReceipt.transaction_date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+                        : '—'}
+                    </p>
+                  </div>
+                  <div style={{ padding: '1rem', backgroundColor: '#f8d7da', borderRadius: '4px', marginBottom: '1.5rem', borderLeft: '4px solid #d13438' }}>
+                    <p style={{ margin: 0, color: '#721c24', fontWeight: 'bold' }}>
+                      ⚠ Warning: This action is permanent and cannot be undone. The receipt will be deleted from the database and cloud storage.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="modal-actions" style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+                <button
+                  className="btn btn-secondary"
+                  onClick={() => setShowDeleteConfirm(false)}
+                  disabled={deleting}
+                >
+                  Cancel
+                </button>
+                <button
+                  className="btn btn-danger"
+                  onClick={handleDeleteReceipt}
+                  disabled={deleting}
+                  style={{ backgroundColor: '#d13438', borderColor: '#d13438', color: 'white' }}
+                >
+                  {deleting ? 'Deleting...' : 'Confirm Delete'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modal */}
       {showModal && selectedReceipt && (
-        <div className="modal-overlay" onClick={() => !deciding && setShowModal(false)}>
+        <div className="modal-overlay" onClick={() => !deciding && !deleting && setShowModal(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h2>Receipt Details</h2>
-              <button className="modal-close" onClick={() => !deciding && setShowModal(false)}>×</button>
+              <button className="modal-close" onClick={() => !deciding && !deleting && setShowModal(false)}>×</button>
             </div>
 
             <div className="modal-content">
@@ -463,21 +558,21 @@ export default function FinanceDashboard() {
                           placeholder="Provide a reason for rejection..."
                           value={rejectionReason === 'reject' ? '' : rejectionReason}
                           onChange={(e) => setRejectionReason(e.target.value)}
-                          disabled={deciding}
+                          disabled={deciding || deleting}
                         />
                       </div>
                       <div style={{ display: 'flex', gap: '1rem' }}>
                         <button
                           className="btn btn-primary"
                           onClick={() => handleDecision('REJECTED')}
-                          disabled={deciding}
+                          disabled={deciding || deleting}
                         >
                           {deciding ? 'Submitting...' : 'Confirm Rejection'}
                         </button>
                         <button
                           className="btn btn-secondary"
                           onClick={() => setRejectionReason('')}
-                          disabled={deciding}
+                          disabled={deciding || deleting}
                         >
                           Cancel
                         </button>
@@ -490,14 +585,14 @@ export default function FinanceDashboard() {
                       <button
                         className="btn btn-primary"
                         onClick={() => handleDecision('APPROVED')}
-                        disabled={deciding}
+                        disabled={deciding || deleting}
                       >
                         ✓ Approve
                       </button>
                       <button
                         className="btn btn-secondary"
                         onClick={() => setRejectionReason('reject')}
-                        disabled={deciding}
+                        disabled={deciding || deleting}
                       >
                         ✗ Reject
                       </button>
@@ -510,6 +605,14 @@ export default function FinanceDashboard() {
                       >
                         📄 Preview
                       </a>
+                      <button
+                        className="btn btn-danger"
+                        onClick={() => setShowDeleteConfirm(true)}
+                        disabled={deciding || deleting}
+                        style={{ backgroundColor: '#d13438', borderColor: '#d13438' }}
+                      >
+                        🗑 Delete
+                      </button>
                     </div>
                   )}
                 </div>

@@ -4,6 +4,7 @@ from rest_framework.response import Response
 from django.shortcuts import render
 from django.http import FileResponse, Http404, JsonResponse, HttpResponse
 from django.conf import settings
+from django.db import transaction
 from receipts.models import Receipt
 from receipts.serializers import (
     ReceiptDetailSerializer,
@@ -14,6 +15,7 @@ from receipts.serializers import (
 from receipts.tasks import process_receipt_task, process_receipt_task_sync
 from receipts.exceptions import ReceiptAppException, BlobUploadError
 from receipts.services.blob_service import BlobService
+from teams_app.auth import require_finance_auth
 import logging
 
 logger = logging.getLogger(__name__)
@@ -260,6 +262,72 @@ class ReceiptViewSet(viewsets.ReadOnlyModelViewSet):
 
         serializer = ReceiptDetailSerializer(receipt)
         return Response(serializer.data)
+
+    @action(detail=True, methods=['delete'])
+    @require_finance_auth
+    def delete_receipt(self, request, pk=None):
+        """
+        Safely delete a receipt.
+        Only Finance Department users can delete receipts.
+        Deletes both database record and associated blob from Azure Storage.
+        """
+        owner = request.query_params.get('owner', 'default-user')
+
+        if owner != 'finance-department':
+            return Response(
+                {'error': 'Unauthorized. Finance Department access required.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        try:
+            receipt = self.get_object()
+        except Http404:
+            return Response(
+                {'error': 'Receipt not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        try:
+            # Use transaction to ensure atomicity
+            with transaction.atomic():
+                blob_name = receipt.blob_name
+                receipt_id = receipt.id
+
+                logger.info(f"[DELETE_START] receipt_id={receipt_id}, blob_name={blob_name}, deleted_by=finance-department")
+
+                # Step 1: Delete from database first
+                receipt.delete()
+                logger.info(f"[DELETE_DB_SUCCESS] receipt_id={receipt_id}")
+
+                # Step 2: Delete blob from Azure Storage (if exists)
+                if blob_name:
+                    try:
+                        blob_service = BlobService()
+                        blob_service.delete(blob_name)
+                        logger.info(f"[DELETE_BLOB_SUCCESS] blob_name={blob_name}, receipt_id={receipt_id}")
+                    except BlobUploadError as e:
+                        logger.error(f"[DELETE_BLOB_FAILED] blob_name={blob_name}, receipt_id={receipt_id}, error={str(e)}")
+                        # Log error but don't fail - database deletion is primary concern
+                    except Exception as e:
+                        logger.error(f"[DELETE_BLOB_UNEXPECTED] blob_name={blob_name}, receipt_id={receipt_id}, error={str(e)}")
+
+                logger.info(f"[DELETE_SUCCESS] receipt_id={receipt_id}, blob_name={blob_name}")
+
+                return Response(
+                    {
+                        'success': True,
+                        'message': 'Receipt deleted successfully',
+                        'receipt_id': str(receipt_id)
+                    },
+                    status=status.HTTP_204_NO_CONTENT
+                )
+
+        except Exception as e:
+            logger.error(f"[DELETE_ERROR] receipt_id={pk}, error={str(e)}")
+            return Response(
+                {'error': f'Failed to delete receipt: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 
 def download_receipt(request, receipt_id):

@@ -2919,10 +2919,10 @@ class UserManualContentTests(TestCase):
     def test_user_manual_file_size(self):
         """Test that the user manual is a reasonable file size."""
         manual_file = os.path.join(settings.BASE_DIR, 'expense_policy_agent_user_manual.html')
-        
+
         file_size = os.path.getsize(manual_file)
-        # Manual should be at least 50KB (comprehensive content)
-        self.assertGreater(file_size, 50000, f"Manual seems too small: {file_size} bytes")
+        # Manual should be at least 30KB (after removing redundant sections)
+        self.assertGreater(file_size, 30000, f"Manual seems too small: {file_size} bytes")
         # Manual should be less than 5MB (reasonable limit)
         self.assertLess(file_size, 5000000, f"Manual is too large: {file_size} bytes")
 

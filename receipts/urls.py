@@ -11,6 +11,6 @@ urlpatterns = [
     # User manual endpoints
     path('user-manual/', user_manual_view, name='user-manual'),
     path('user-manual/info/', user_manual_info_view, name='user-manual-info'),
-    # DRF routed endpoints
+    # DRF routed endpoints (includes delete_receipt action at /receipts/{id}/delete_receipt/)
     path('', include(router.urls)),
 ]

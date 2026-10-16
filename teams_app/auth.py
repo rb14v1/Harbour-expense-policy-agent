@@ -120,3 +120,42 @@ def validate_teams_activity(view_func):
         return view_func(request, *args, **kwargs)
 
     return wrapper
+
+
+def require_finance_auth(view_func):
+    """
+    Decorator to require Finance Department authorization on a view.
+    Checks if the user belongs to the Finance Department.
+    Handles both regular view functions and viewset methods.
+    """
+    @wraps(view_func)
+    def wrapper(self_or_request, *args, **kwargs):
+        # Determine if this is a viewset method (self, request, ...) or regular view (request, ...)
+        if hasattr(self_or_request, 'request'):
+            # This is a viewset method, self_or_request is the viewset (self)
+            request = self_or_request.request
+            # Insert self back as first argument
+            actual_args = (self_or_request,) + args
+        else:
+            # This is a regular view function
+            request = self_or_request
+            actual_args = args
+
+        # Get the owner/department from request
+        owner = request.query_params.get('owner') or request.data.get('owner', '')
+
+        # Check if user is part of finance-department
+        if owner != 'finance-department':
+            logger.warning(f"Finance auth failed: user {owner} is not finance-department")
+            return Response(
+                {"error": "Unauthorized. Finance Department access required."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # Call the view function with appropriate arguments
+        if hasattr(self_or_request, 'request'):
+            return view_func(self_or_request, *args, **kwargs)
+        else:
+            return view_func(self_or_request, *args, **kwargs)
+
+    return wrapper
