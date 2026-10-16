@@ -27,7 +27,7 @@ except:
     CELERY_AVAILABLE = False
 
 
-class ReceiptViewSet(viewsets.ReadOnlyModelViewSet):
+class ReceiptViewSet(viewsets.ModelViewSet):
     queryset = Receipt.objects.all()
     parser_classes = (parsers.MultiPartParser, parsers.FormParser)
 
