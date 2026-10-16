@@ -142,7 +142,13 @@ def require_finance_auth(view_func):
             actual_args = args
 
         # Get the owner/department from request
-        owner = request.query_params.get('owner') or request.data.get('owner', '')
+        # Handle both Django requests (GET, POST) and DRF requests (query_params, data)
+        if hasattr(request, 'query_params'):
+            # DRF Request wrapper
+            owner = request.query_params.get('owner') or request.data.get('owner', '')
+        else:
+            # Django HttpRequest
+            owner = request.GET.get('owner') or (request.POST.get('owner') if hasattr(request, 'POST') else '')
 
         # Check if user is part of finance-department
         if owner != 'finance-department':
