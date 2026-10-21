@@ -1,0 +1,118 @@
+{
+  "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.14/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.14",
+  "version": "1.0.0",
+  "id": "08923630-1eab-4fed-a15c-9bb6f7bec5cf",
+  "packageName": "com.expensepolicy.agent",
+  "developer": {
+    "name": "Finance Operations",
+    "websiteUrl": "https://unmentionable-zechariah-uncritically.ngrok-free.dev",
+    "privacyUrl": "https://unmentionable-zechariah-uncritically.ngrok-free.dev/privacy",
+    "termsOfUseUrl": "https://unmentionable-zechariah-uncritically.ngrok-free.dev/terms"
+  },
+  "name": {
+    "short": "Expense Policy Agent",
+    "full": "Expense Policy Agent - Receipt Processing & Finance Review"
+  },
+  "description": {
+    "short": "Upload receipts and review expense claims.",
+    "full": "Process expense receipts with OCR extraction, duplicate detection, and automated policy validation. Employees upload receipts and Finance Department reviews, approves, or rejects claims in Teams."
+  },
+  "icons": {
+    "outline": "assets/outline.png",
+    "color": "assets/color.png"
+  },
+  "accentColor": "#0078D4",
+  "bots": [
+    {
+      "botId": "08923630-1eab-4fed-a15c-9bb6f7bec5cf",
+      "scopes": [
+        "team",
+        "personal",
+        "groupChat"
+      ],
+      "commandLists": [
+        {
+          "scopes": [
+            "team",
+            "personal",
+            "groupChat"
+          ],
+          "commands": [
+            {
+              "title": "Upload Receipt",
+              "description": "Upload an expense receipt for processing"
+            },
+            {
+              "title": "Check Status",
+              "description": "Check the status of a receipt"
+            },
+            {
+              "title": "View History",
+              "description": "View your receipt history"
+            },
+            {
+              "title": "Help",
+              "description": "Get help with using the Expense Policy Agent"
+            }
+          ]
+        }
+      ],
+      "supportsFiles": true,
+      "isNotificationOnly": false
+    }
+  ],
+  "staticTabs": [
+    {
+      "entityId": "finance-review",
+      "name": "Finance Review",
+      "contentUrl": "https://unmentionable-zechariah-uncritically.ngrok-free.dev/finance/tab",
+      "websiteUrl": "https://unmentionable-zechariah-uncritically.ngrok-free.dev/finance/tab",
+      "scopes": [
+        "team"
+      ],
+      "context": [
+        "channelTab"
+      ]
+    }
+  ],
+  "composeExtensions": [
+    {
+      "botId": "08923630-1eab-4fed-a15c-9bb6f7bec5cf",
+      "commands": [
+        {
+          "id": "searchReceipts",
+          "context": [
+            "compose",
+            "commandBox"
+          ],
+          "description": "Search your receipts",
+          "title": "Search Receipts",
+          "initialRun": false,
+          "parameters": [
+            {
+              "name": "searchQuery",
+              "title": "Search",
+              "description": "Enter receipt ID or vendor name",
+              "inputType": "text"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "permissions": [
+    "identity",
+    "messageTeamMembers"
+  ],
+  "validDomains": [
+    "unmentionable-zechariah-uncritically.ngrok-free.dev",
+    "localhost:8000",
+    "localhost:3000",
+    "teams.microsoft.com"
+  ],
+  "webApplicationInfo": {
+    "id": "08923630-1eab-4fed-a15c-9bb6f7bec5cf",
+    "resource": "api://unmentionable-zechariah-uncritically.ngrok-free.dev/08923630-1eab-4fed-a15c-9bb6f7bec5cf"
+  }
+}

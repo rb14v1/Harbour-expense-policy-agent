@@ -1,0 +1,46 @@
+# Core Django
+Django==5.2.0
+djangorestframework==3.18.3
+django-cors-headers==4.4.0
+python-dotenv==1.0.1
+
+# Database
+psycopg==3.2.1
+
+# File handling
+Pillow==12.0.0
+python-multipart==0.0.32
+pypdf==4.0.1
+
+# Azure services
+azure-storage-blob==12.21.0
+azure-ai-documentintelligence==1.0.0
+azure-identity==1.16.1
+azure-common==1.1.28
+
+# Microsoft Teams SDK (stable version)
+microsoft-teams-apps==2.0.16
+
+# HTTP & utilities
+requests==2.32.3
+pydantic>=2.7.0
+PyJWT==2.12.1
+
+# Production server
+gunicorn==22.0.0
+uvicorn==0.34.3
+
+# Testing
+pytest==7.4.4
+pytest-asyncio==0.23.3
+pytest-cov==4.1.0
+httpx==0.28.1
+
+# Semantic classification
+sentence-transformers==3.0.1
+huggingface_hub>=0.19.0
+
+# Optional: Background processing (Celery + Redis)
+# Uncomment these if using async task processing
+# celery==5.4.0
+# redis==5.1.0

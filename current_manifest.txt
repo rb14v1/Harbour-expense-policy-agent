@@ -1,0 +1,48 @@
+{
+  "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.14/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.14",
+  "version": "1.0.0",
+  "id": "08923630-1eab-4fed-a15c-9bb6f7bec5cf",
+  "packageName": "com.expensepolicy.agent",
+  "developer": {
+    "name": "Finance Operations",
+    "websiteUrl": "https://unmentionable-zechariah-uncritically.ngrok-free.dev",
+    "privacyUrl": "https://unmentionable-zechariah-uncritically.ngrok-free.dev/privacy",
+    "termsOfUseUrl": "https://unmentionable-zechariah-uncritically.ngrok-free.dev/terms"
+  },
+  "name": {
+    "short": "Expense Policy Agent",
+    "full": "Expense Policy Agent - Finance Review"
+  },
+  "description": {
+    "short": "Upload receipts and review expense claims.",
+    "full": "Review and approve expense receipts with Teams. Temporary test package - Finance Review tab only."
+  },
+  "icons": {
+    "outline": "assets/outline.png",
+    "color": "assets/color.png"
+  },
+  "accentColor": "#0078D4",
+  "staticTabs": [
+    {
+      "entityId": "finance-review",
+      "name": "Finance Review",
+      "contentUrl": "https://unmentionable-zechariah-uncritically.ngrok-free.dev/finance/tab",
+      "websiteUrl": "https://unmentionable-zechariah-uncritically.ngrok-free.dev/finance/tab",
+      "scopes": [
+        "personal"
+      ]
+    }
+  ],
+  "permissions": [
+    "identity"
+  ],
+  "validDomains": [
+    "unmentionable-zechariah-uncritically.ngrok-free.dev",
+    "teams.microsoft.com"
+  ],
+  "webApplicationInfo": {
+    "id": "08923630-1eab-4fed-a15c-9bb6f7bec5cf",
+    "resource": "api://unmentionable-zechariah-uncritically.ngrok-free.dev/08923630-1eab-4fed-a15c-9bb6f7bec5cf"
+  }
+}

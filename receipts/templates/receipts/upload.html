@@ -1,0 +1,1117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Expense Policy Assistant</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .chat-container {
+            width: 100%;
+            max-width: 600px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            display: flex;
+            flex-direction: column;
+            height: 90vh;
+            max-height: 800px;
+        }
+
+        .chat-header {
+            padding: 20px;
+            background: #667eea;
+            color: white;
+            border-radius: 12px 12px 0 0;
+            text-align: center;
+        }
+
+        .chat-header h1 {
+            font-size: 20px;
+            margin-bottom: 5px;
+        }
+
+        .chat-header p {
+            font-size: 12px;
+            opacity: 0.9;
+        }
+
+        .chat-header-actions {
+            margin-top: 12px;
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+        }
+
+        .manual-link {
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.9);
+            text-decoration: none;
+            cursor: pointer;
+            padding: 6px 12px;
+            border-radius: 6px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            transition: all 0.3s ease;
+            display: inline-block;
+        }
+
+        .manual-link:hover {
+            background: rgba(255, 255, 255, 0.15);
+            border-color: rgba(255, 255, 255, 0.6);
+            text-decoration: none;
+        }
+
+        .manual-modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .manual-modal.show {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .manual-modal-content {
+            background: white;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 1000px;
+            max-height: 85vh;
+            overflow-y: auto;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            position: relative;
+            animation: slideInUp 0.3s ease;
+        }
+
+        @keyframes slideInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .manual-modal-close {
+            position: sticky;
+            top: 0;
+            display: flex;
+            justify-content: flex-end;
+            padding: 15px;
+            border-bottom: 1px solid #eee;
+            background: white;
+            z-index: 10;
+        }
+
+        .manual-modal-close button {
+            background: #f0f0f0;
+            border: none;
+            width: 36px;
+            height: 36px;
+            border-radius: 6px;
+            font-size: 20px;
+            cursor: pointer;
+            transition: background 0.3s ease;
+        }
+
+        .manual-modal-close button:hover {
+            background: #e0e0e0;
+        }
+
+        .manual-loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 200px;
+            font-size: 16px;
+            color: #666;
+        }
+
+        .manual-loading::after {
+            content: '';
+            animation: spin 1s linear infinite;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            margin-left: 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .message {
+            display: flex;
+            gap: 10px;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .message.user {
+            flex-direction: row-reverse;
+        }
+
+        .message-bubble {
+            padding: 12px 16px;
+            border-radius: 12px;
+            max-width: 80%;
+            word-wrap: break-word;
+        }
+
+        .message.assistant .message-bubble {
+            background: #f0f0f0;
+            color: #333;
+        }
+
+        .message.user .message-bubble {
+            background: #667eea;
+            color: white;
+        }
+
+        .loading {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .result-card {
+            background: #f9f9f9;
+            border-left: 4px solid #667eea;
+            padding: 16px;
+            border-radius: 8px;
+            font-size: 13px;
+        }
+
+        .result-card.approved {
+            border-left-color: #10b981;
+        }
+
+        .result-card.rejected {
+            border-left-color: #ef4444;
+        }
+
+        .result-card.duplicate {
+            border-left-color: #f59e0b;
+        }
+
+        .result-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .result-row:last-child {
+            border-bottom: none;
+        }
+
+        .result-label {
+            font-weight: 600;
+            color: #666;
+        }
+
+        .result-value {
+            color: #333;
+            text-align: right;
+            flex: 1;
+            margin-left: 12px;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .status-badge.approved {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .status-badge.rejected {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .status-badge.duplicate {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .category-selector {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin: 12px 0;
+        }
+
+        .category-selector select {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .category-selector button {
+            padding: 10px 16px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+
+        .category-selector button:hover {
+            background: #5568d3;
+        }
+
+        .category-selector button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .chat-input-area {
+            padding: 16px;
+            border-top: 1px solid #e0e0e0;
+            display: flex;
+            gap: 10px;
+        }
+
+        .file-input-wrapper {
+            position: relative;
+            flex: 1;
+        }
+
+        input[type="file"] {
+            position: absolute;
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .file-input-label {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 10px 16px;
+            background: #f0f0f0;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .file-input-label:hover {
+            background: #e0e0e0;
+        }
+
+        .send-button {
+            padding: 10px 20px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+
+        .send-button:hover:not(:disabled) {
+            background: #5568d3;
+        }
+
+        .send-button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .selected-file {
+            font-size: 12px;
+            color: #666;
+            padding: 8px;
+            background: #f9f9f9;
+            border-radius: 4px;
+            text-align: center;
+        }
+
+        .clear-button {
+            padding: 8px 12px;
+            background: #f0f0f0;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: background 0.2s;
+        }
+
+        .clear-button:hover {
+            background: #e0e0e0;
+        }
+
+        .attachment-card {
+            background: #f5f5f5;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 12px;
+            display: inline-block;
+            max-width: 100%;
+        }
+
+        .attachment-icon {
+            font-size: 20px;
+            margin-right: 8px;
+        }
+
+        .attachment-info {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .attachment-name {
+            font-weight: 600;
+            color: #333;
+            word-break: break-word;
+        }
+
+        .attachment-meta {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+            flex-wrap: wrap;
+        }
+
+        .action-button {
+            padding: 8px 12px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            transition: background 0.2s;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .action-button:hover {
+            background: #5568d3;
+        }
+
+        .action-button.secondary {
+            background: #f0f0f0;
+            color: #667eea;
+        }
+
+        .action-button.secondary:hover {
+            background: #e0e0e0;
+        }
+
+        .error-message {
+            color: #dc2626;
+        }
+
+        .success-message {
+            color: #10b981;
+        }
+
+        .field-group {
+            margin-bottom: 12px;
+        }
+
+        .field-group:last-child {
+            margin-bottom: 0;
+        }
+
+        .selected-files-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-height: 200px;
+            overflow-y: auto;
+            background: #f9f9f9;
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 12px;
+        }
+
+        .selected-file-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px;
+            background: white;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+
+        .selected-file-item-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex: 1;
+        }
+
+        .selected-file-item-name {
+            color: #333;
+            font-weight: 500;
+            word-break: break-word;
+            max-width: 400px;
+        }
+
+        .selected-file-item-size {
+            color: #999;
+            font-size: 11px;
+            white-space: nowrap;
+        }
+
+        .remove-file-btn {
+            padding: 4px 8px;
+            background: #fee2e2;
+            color: #991b1b;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: 600;
+            transition: background 0.2s;
+            white-space: nowrap;
+        }
+
+        .remove-file-btn:hover {
+            background: #fecaca;
+        }
+
+        .file-count {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <div class="chat-header">
+            <h1>💰 Expense Policy Assistant</h1>
+            <p>Upload your expense receipts for automated processing</p>
+            <div class="chat-header-actions">
+                <a href="javascript:void(0)" class="manual-link" onclick="openUserManual()">📖 User Manual</a>
+            </div>
+        </div>
+
+        <div class="chat-messages" id="chatMessages">
+            <div class="message assistant">
+                <div class="message-bubble">
+                    Hi! I'm your Expense Policy Assistant. Send me your expense receipt (PDF, JPG, or PNG) and I'll process it for you.
+                </div>
+            </div>
+        </div>
+
+        <div class="chat-input-area">
+            <div class="file-input-wrapper" style="flex: 1;">
+                <label for="receiptFiles" class="file-input-label">
+                    📎 Choose receipts
+                </label>
+                <input type="file" id="receiptFiles" accept=".pdf,.jpg,.jpeg,.png" multiple />
+            </div>
+            <button class="send-button" id="uploadButton" onclick="uploadReceipts()">Send</button>
+            <button class="clear-button" id="clearButton" onclick="clearChat()">New</button>
+        </div>
+
+        <div id="selectedFilesList" class="selected-files-list" style="display: none;"></div>
+    </div>
+
+    <!-- User Manual Modal -->
+    <div id="manualModal" class="manual-modal">
+        <div class="manual-modal-content">
+            <div class="manual-modal-close">
+                <button onclick="closeUserManual()">&times;</button>
+            </div>
+            <div id="manualContent" class="manual-content"></div>
+        </div>
+    </div>
+
+    <script>
+        const OWNER = 'default-user';
+        const CATEGORY_CONFIDENCE_THRESHOLD = 0.80;
+        const MAX_FILE_SIZE_MB = 50;
+        const COMPRESSION_THRESHOLD_MB = 5;
+        let selectedFiles = [];
+
+        document.getElementById('receiptFiles').addEventListener('change', function(e) {
+            const newFiles = Array.from(this.files);
+
+            newFiles.forEach(file => {
+                if (!selectedFiles.some(f => f.name === file.name && f.size === file.size)) {
+                    selectedFiles.push(file);
+                }
+            });
+
+            updateSelectedFilesList();
+        });
+
+        function updateSelectedFilesList() {
+            const container = document.getElementById('selectedFilesList');
+
+            if (selectedFiles.length === 0) {
+                container.style.display = 'none';
+                return;
+            }
+
+            container.innerHTML = '';
+            selectedFiles.forEach((file, index) => {
+                const fileSize = (file.size / 1024 / 1024).toFixed(2);
+                const fileItem = document.createElement('div');
+                fileItem.className = 'selected-file-item';
+                fileItem.innerHTML = `
+                    <div class="selected-file-item-info">
+                        <span class="selected-file-item-name">📄 ${escapeHtml(file.name)}</span>
+                        <span class="selected-file-item-size">${fileSize} MB</span>
+                    </div>
+                    <button type="button" class="remove-file-btn" onclick="removeFile(${index})">Remove</button>
+                `;
+                container.appendChild(fileItem);
+            });
+
+            container.style.display = 'flex';
+        }
+
+        function removeFile(index) {
+            selectedFiles.splice(index, 1);
+            updateSelectedFilesList();
+
+            if (selectedFiles.length === 0) {
+                document.getElementById('receiptFiles').value = '';
+            }
+        }
+
+        function _formatErrorMessage(backendError) {
+            if (!backendError || typeof backendError !== 'string') {
+                return 'Upload failed. Please try again.';
+            }
+
+            const error = backendError.toLowerCase();
+
+            if (error.includes('extraction failed') || error.includes('couldn\'t read')) {
+                return 'We couldn\'t read the receipt. The document may be blurry, unclear, or contain unreadable content. Please upload a clearer image or PDF.';
+            }
+            if (error.includes('empty') && !error.includes('extraction')) {
+                return 'The uploaded file is empty. Please select a valid receipt.';
+            }
+            if (error.includes('too large') || error.includes('exceeds')) {
+                const match = backendError.match(/(\d+(?:\.\d+)?)\s*(?:MB|mb)/);
+                if (match) {
+                    return `File is too large (${match[1]} MB). Maximum allowed size is ${MAX_FILE_SIZE_MB} MB.`;
+                }
+                return `File is too large. Maximum allowed size is ${MAX_FILE_SIZE_MB} MB.`;
+            }
+            if (error.includes('unsupported') && error.includes('extension')) {
+                return 'Unsupported file type. Please upload a PDF, JPG, JPEG, or PNG file.';
+            }
+            if (error.includes('unsupported')) {
+                return 'Unsupported file type. Please upload a PDF, JPG, JPEG, or PNG file.';
+            }
+            if (error.includes('not appear to be a valid pdf')) {
+                return 'The file does not appear to be a valid PDF. Please check the file and try again.';
+            }
+            if (error.includes('zero pages') || error.includes('empty pdf')) {
+                return 'The PDF file is empty. Please upload a PDF with content.';
+            }
+            if (error.includes('corrupted') || error.includes('malformed')) {
+                return 'The file appears to be corrupted. Please select a different file.';
+            }
+            if (error.includes('blank') || error.includes('mostly white')) {
+                return 'The image appears to be blank or mostly white. Please upload an image with visible receipt content.';
+            }
+            if (error.includes('too small') || error.includes('invalid dimensions')) {
+                return 'The image is too small. Please upload a higher resolution image.';
+            }
+            if (error.includes('not appear to be a valid')) {
+                return 'The file does not appear to be a valid receipt image. Please check the file and try again.';
+            }
+
+            return `Upload failed: ${escapeHtml(backendError)}`;
+        }
+
+        async function uploadReceipts() {
+            if (selectedFiles.length === 0) {
+                appendMessage('assistant', 'Please select at least one receipt file.');
+                return;
+            }
+
+            const filesToProcess = selectedFiles.filter(file => {
+                const maxSizeBytes = MAX_FILE_SIZE_MB * 1024 * 1024;
+                if (file.size > maxSizeBytes) {
+                    appendMessage('assistant', `⚠️ ${escapeHtml(file.name)} is too large (${(file.size / 1024 / 1024).toFixed(2)} MB). Maximum allowed is ${MAX_FILE_SIZE_MB} MB.`);
+                    return false;
+                }
+                return true;
+            });
+
+            if (filesToProcess.length === 0) {
+                return;
+            }
+
+            filesToProcess.forEach(file => {
+                const fileTypeMap = {
+                    'application/pdf': 'PDF',
+                    'image/jpeg': 'JPG',
+                    'image/png': 'PNG'
+                };
+                const fileType = fileTypeMap[file.type] || 'File';
+                const fileSize = (file.size / 1024 / 1024).toFixed(2);
+
+                const attachmentHtml = `<div class="attachment-card"><div class="attachment-info"><div class="attachment-name">📄 ${escapeHtml(file.name)}</div><div class="attachment-meta">${fileType} • ${fileSize} MB</div></div></div>`;
+                appendMessage('user', attachmentHtml);
+            });
+
+            for (const file of filesToProcess) {
+                await uploadSingleReceipt(file);
+            }
+
+            selectedFiles = [];
+            updateSelectedFilesList();
+            document.getElementById('receiptFiles').value = '';
+        }
+
+        async function uploadSingleReceipt(file) {
+            const processingMsgId = `processing-${Date.now()}-${Math.random()}`;
+            appendMessage('assistant', `<div id="${processingMsgId}" class="loading"><span>Processing ${escapeHtml(file.name)}...</span><div class="spinner"></div></div>`);
+
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('owner', OWNER);
+
+                const response = await fetch('/api/v1/receipts/upload/', {
+                    method: 'POST',
+                    body: formData,
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    const receiptId = data.receipt_id;
+
+                    if (data.status === 'EXACT_DUPLICATE') {
+                        removeProcessingMessage(processingMsgId);
+                        appendMessage('assistant', `⚠️ ${escapeHtml(file.name)}: ${escapeHtml(data.message)}`);
+                    } else {
+                        await pollReceiptStatus(receiptId, file.name, processingMsgId);
+                    }
+                } else {
+                    let errorMessage = 'Upload failed. Please try again.';
+                    try {
+                        const errorData = await response.json();
+                        if (errorData.errors && errorData.errors.file && Array.isArray(errorData.errors.file)) {
+                            const fileErrors = errorData.errors.file;
+                            if (fileErrors.length > 0) {
+                                const backendError = fileErrors[0];
+                                errorMessage = _formatErrorMessage(backendError);
+                            }
+                        } else if (errorData.error) {
+                            errorMessage = _formatErrorMessage(errorData.error);
+                        }
+                    } catch (parseError) {
+                        // Response wasn't JSON or parsing failed; use fallback
+                    }
+                    removeProcessingMessage(processingMsgId);
+                    appendMessage('assistant', `❌ ${escapeHtml(file.name)}: ${errorMessage}`);
+                }
+            } catch (error) {
+                removeProcessingMessage(processingMsgId);
+                appendMessage('assistant', `❌ ${escapeHtml(file.name)}: Error - ${escapeHtml(error.message)}`);
+            }
+        }
+
+        async function pollReceiptStatus(receiptId, fileName, processingMsgId) {
+            const maxAttempts = 30;
+            let attempts = 0;
+
+            return new Promise((resolve) => {
+                const poll = async () => {
+                    try {
+                        const response = await fetch(`/api/v1/receipts/${receiptId}/?owner=${OWNER}`, {
+                            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                        });
+
+                        if (response.ok) {
+                            const receipt = await response.json();
+
+                            if (['APPROVED', 'REJECTED', 'NEEDS_REVIEW', 'EXACT_DUPLICATE', 'SEMANTIC_DUPLICATE', 'FAILED'].includes(receipt.status)) {
+                                await handleReceiptResult(receipt, fileName, processingMsgId);
+                                resolve();
+                            } else {
+                                attempts++;
+                                if (attempts < maxAttempts) {
+                                    setTimeout(poll, 1000);
+                                } else {
+                                    removeProcessingMessage(processingMsgId);
+                                    appendMessage('assistant', `⏳ Receipt processing is taking longer than expected. Please refresh to check the status.`);
+                                    resolve();
+                                }
+                            }
+                        } else {
+                            attempts++;
+                            if (attempts < maxAttempts) {
+                                setTimeout(poll, 1000);
+                            } else {
+                                removeProcessingMessage(processingMsgId);
+                                appendMessage('assistant', `❌ ${escapeHtml(fileName)}: Unable to retrieve processing status. Please refresh and try again.`);
+                                resolve();
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Poll error:', error);
+                        attempts++;
+                        if (attempts < maxAttempts) {
+                            setTimeout(poll, 1000);
+                        } else {
+                            removeProcessingMessage(processingMsgId);
+                            appendMessage('assistant', `❌ ${escapeHtml(fileName)}: Connection error while processing. Please refresh and try again.`);
+                            resolve();
+                        }
+                    }
+                };
+
+                poll();
+            });
+        }
+
+        async function handleReceiptResult(receipt, fileName, processingMsgId) {
+            removeProcessingMessage(processingMsgId);
+            const category_confidence = receipt.category_confidence || 0;
+
+            if (category_confidence < CATEGORY_CONFIDENCE_THRESHOLD && receipt.status !== 'EXACT_DUPLICATE' && receipt.status !== 'SEMANTIC_DUPLICATE' && receipt.status !== 'FAILED') {
+                appendMessage('assistant', `I couldn't confidently determine the expense category for ${escapeHtml(fileName)}. Please select one:`);
+                await loadCategorySelector(receipt.id, fileName);
+            } else {
+                displayReceiptResult(receipt, fileName);
+            }
+        }
+
+        async function loadCategorySelector(receiptId, fileName) {
+            try {
+                const response = await fetch('/api/v1/receipts/categories/', {
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    let html = '<div class="category-selector"><select id="categorySelect"><option value="">Select a category...</option>';
+
+                    (data.categories || []).forEach(cat => {
+                        html += `<option value="${escapeHtml(cat)}">${escapeHtml(cat)}</option>`;
+                    });
+
+                    html += `</select><button onclick="confirmCategory('${receiptId}', '${escapeHtml(fileName)}')">Confirm Category</button></div>`;
+                    const lastMsg = document.querySelector('.chat-messages .message:last-child .message-bubble');
+                    if (lastMsg) lastMsg.innerHTML += html;
+                } else {
+                    appendMessage('assistant', 'Could not load categories. Please refresh the page.');
+                }
+            } catch (error) {
+                console.error('Category load error:', error);
+                appendMessage('assistant', 'Could not load categories. Please refresh the page.');
+            }
+        }
+
+        async function confirmCategory(receiptId, fileName) {
+            const select = document.getElementById('categorySelect');
+            const category = select.value;
+
+            if (!category) {
+                appendMessage('assistant', 'Please select a category.');
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/v1/receipts/${receiptId}/set_category/?owner=${OWNER}`, {
+                    method: 'POST',
+                    body: JSON.stringify({ category }),
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                });
+
+                if (response.ok) {
+                    const receipt = await response.json();
+                    const selector = document.querySelector('.category-selector');
+                    if (selector) selector.remove();
+                    displayReceiptResult(receipt, fileName);
+                } else {
+                    let errorMsg = 'Failed to save category. Please try again.';
+                    try {
+                        const errorData = await response.json();
+                        if (errorData.error) {
+                            errorMsg = errorData.error;
+                        }
+                    } catch (e) {
+                        // Could not parse error response
+                    }
+                    appendMessage('assistant', errorMsg);
+                }
+            } catch (error) {
+                console.error('Category confirmation error:', error);
+                appendMessage('assistant', `Error saving category: ${escapeHtml(error.message)}`);
+            }
+        }
+
+        function displayReceiptResult(receipt, fileName) {
+            let statusClass = 'approved';
+            let statusText = '✅ APPROVED';
+
+            if (receipt.status === 'APPROVED') {
+                statusClass = 'approved';
+                statusText = '✅ APPROVED';
+            } else if (receipt.status === 'REJECTED') {
+                statusClass = 'rejected';
+                statusText = '❌ REJECTED';
+            } else if (receipt.status === 'NEEDS_REVIEW') {
+                statusClass = 'processing';
+                statusText = '⏳ PENDING FINANCE REVIEW';
+            } else if (receipt.status === 'EXACT_DUPLICATE') {
+                statusClass = 'duplicate';
+                statusText = '⚠️ EXACT DUPLICATE';
+            } else if (receipt.status === 'SEMANTIC_DUPLICATE') {
+                statusClass = 'duplicate';
+                statusText = '⚠️ POSSIBLE DUPLICATE';
+            } else if (receipt.status === 'FAILED') {
+                statusClass = 'rejected';
+                statusText = '❌ FAILED';
+            }
+
+            let html = `<div class="result-card ${statusClass}">`;
+            html += `<div class="result-row"><div class="result-label">Filename</div><div class="result-value"><strong>${escapeHtml(fileName || receipt.original_filename)}</strong></div></div>`;
+            html += `<div class="result-row"><div class="result-label">Status</div><div class="result-value"><span class="status-badge ${statusClass}">${statusText}</span></div></div>`;
+
+            if (receipt.vendor_name) html += `<div class="result-row"><div class="result-label">Vendor</div><div class="result-value">${escapeHtml(receipt.vendor_name)}</div></div>`;
+            if (receipt.transaction_date) html += `<div class="result-row"><div class="result-label">Date</div><div class="result-value">${formatDate(receipt.transaction_date)}</div></div>`;
+            if (receipt.total_amount) html += `<div class="result-row"><div class="result-label">Amount</div><div class="result-value">${receipt.currency || 'N/A'} ${receipt.total_amount}</div></div>`;
+
+            if (receipt.category) {
+                html += `<div class="result-row"><div class="result-label">Category</div><div class="result-value">${escapeHtml(receipt.category)}</div></div>`;
+
+                if (receipt.category_confidence !== null && receipt.category_confidence !== undefined) {
+                    const confidence = (receipt.category_confidence * 100).toFixed(0);
+                    html += `<div class="result-row"><div class="result-label">Confidence</div><div class="result-value">${confidence}%</div></div>`;
+                }
+
+                if (receipt.category_reason) {
+                    html += `<div class="result-row"><div class="result-label">Reason</div><div class="result-value">${escapeHtml(receipt.category_reason)}</div></div>`;
+                }
+            }
+
+            if (receipt.duplicate_reason) {
+                html += `<div class="result-row"><div class="result-label">Duplicate Info</div><div class="result-value">${escapeHtml(receipt.duplicate_reason)}</div></div>`;
+            }
+
+            if (receipt.processing_message && receipt.status === 'FAILED') {
+                html += `<div class="result-row"><div class="result-label">Message</div><div class="result-value">${escapeHtml(receipt.processing_message)}</div></div>`;
+            }
+
+            html += '<div class="action-buttons">';
+            html += `<a class="action-button" href="/api/v1/receipts/${receipt.id}/preview/?owner=${OWNER}" target="_blank">📄 Preview Receipt</a>`;
+            html += '</div>';
+            html += '</div>';
+
+            appendMessage('assistant', html);
+        }
+
+        function clearFileInput() {
+            document.getElementById('receiptFiles').value = '';
+            selectedFiles = [];
+            updateSelectedFilesList();
+        }
+
+        function appendMessage(role, content) {
+            const container = document.getElementById('chatMessages');
+            const msgDiv = document.createElement('div');
+            msgDiv.className = `message ${role}`;
+            msgDiv.innerHTML = `<div class="message-bubble">${content}</div>`;
+            container.appendChild(msgDiv);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function removeProcessingMessage(msgId) {
+            const element = document.getElementById(msgId);
+            if (element) {
+                element.closest('.message').remove();
+            }
+        }
+
+        function removeLastMessage() {
+            const messages = document.querySelectorAll('#chatMessages .message');
+            if (messages.length > 0) messages[messages.length - 1].remove();
+        }
+
+        function clearChat() {
+            document.getElementById('chatMessages').innerHTML = '';
+            appendMessage('assistant', '👋 Chat cleared. Ready for new receipts!');
+            clearFileInput();
+        }
+
+        function formatDate(dateStr) {
+            if (!dateStr) return 'N/A';
+            try {
+                const date = new Date(dateStr);
+                return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+            } catch {
+                return dateStr;
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // User Manual Functions
+        function openUserManual() {
+            const modal = document.getElementById('manualModal');
+            const content = document.getElementById('manualContent');
+
+            // Show loading state
+            content.innerHTML = '<div class="manual-loading">Loading user manual</div>';
+            modal.classList.add('show');
+
+            // Fetch manual from API
+            fetch('/api/v1/user-manual/')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.text();
+                })
+                .then(html => {
+                    content.innerHTML = html;
+                    // Smooth scroll to top
+                    content.parentElement.scrollTop = 0;
+                })
+                .catch(error => {
+                    console.error('Error loading user manual:', error);
+                    content.innerHTML = `
+                        <div style="padding: 40px; text-align: center;">
+                            <p style="color: #666; margin-bottom: 20px;">
+                                Sorry, we couldn't load the user manual. Please try again later.
+                            </p>
+                            <p style="font-size: 12px; color: #999;">
+                                Error: ${error.message}
+                            </p>
+                            <button onclick="closeUserManual()" style="
+                                margin-top: 20px;
+                                padding: 10px 20px;
+                                background: #667eea;
+                                color: white;
+                                border: none;
+                                border-radius: 6px;
+                                cursor: pointer;
+                            ">Close</button>
+                        </div>
+                    `;
+                });
+        }
+
+        function closeUserManual() {
+            const modal = document.getElementById('manualModal');
+            modal.classList.remove('show');
+        }
+
+        // Close manual when clicking outside the modal content
+        document.getElementById('manualModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeUserManual();
+            }
+        });
+
+        // Close manual with Escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeUserManual();
+            }
+        });
+    </script>
+</body>
+</html>

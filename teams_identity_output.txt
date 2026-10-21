@@ -1,0 +1,31 @@
+.env:22:CLIENT_ID=08923630-1eab-4fed-a15c-9bb6f7bec5cf
+.env.example:27:TEAMS_SERVICE_URL=https://smba.trafficmanager.net/apis/
+config\settings.py:113:TEAMS_APP_ID = os.getenv('CLIENT_ID', '')
+config\settings.py:116:TEAMS_SERVICE_URL = os.getenv('TEAMS_SERVICE_URL', 'https://smba.trafficmanager.net/apis/')
+teams_app\auth.py:46:            configured_id = settings.TEAMS_APP_ID
+teams_app\manifest.json:5:  "id": "08923630-1eab-4fed-a15c-9bb6f7bec5cf",
+teams_app\manifest.json:45:    "id": "08923630-1eab-4fed-a15c-9bb6f7bec5cf",
+teams_app\manifest.json:46:    "resource": "api://unmentionable-zechariah-uncritically.ngrok-free.dev/08923630-1eab-4fed-a15c-9bb6f7bec5cf"
+teams_service\config.py:14:    TEAMS_APP_ID: str = os.getenv("CLIENT_ID", "")
+teams_service\config.py:16:    TEAMS_TENANT_ID: str = os.getenv("TENANT_ID", "")
+teams_service\config.py:34:        if not self.TEAMS_APP_ID:
+teams_service\config.py:38:        if not self.TEAMS_TENANT_ID:
+teams_service\config.py:44:            "client_id": self.TEAMS_APP_ID,
+teams_service\config.py:46:            "tenant_id": self.TEAMS_TENANT_ID,
+teams_service\config.py:57:        print(f"  Teams App ID: {Config.TEAMS_APP_ID[:8]}...")
+teams_service\config.py:58:        print(f"  Teams Tenant ID: {Config.TEAMS_TENANT_ID[:8]}...")
+teams_service\main.py:102:        "teams_app_id": config.TEAMS_APP_ID[:8] + "...",
+teams_service\tests\test_config.py:49:    assert config.TEAMS_APP_ID == "test-client-id"
+teams_service\tests\test_config.py:51:    assert config.TEAMS_TENANT_ID == "test-tenant-id"
+venv\Lib\site-packages\microsoft_teams\apps\app.py:123:        self.server = HttpServer(adapter, messaging_endpoint=self.options.messaging_endpoint)
+venv\Lib\site-packages\microsoft_teams\apps\http\http_server.py:39:    def __init__(self, adapter: HttpServerAdapter, messaging_endpoint: str = "/api/messages"):
+venv\Lib\site-packages\microsoft_teams\apps\http\http_server.py:41:        normalized_endpoint = messaging_endpoint.strip()
+venv\Lib\site-packages\microsoft_teams\apps\http\http_server.py:43:            raise ValueError("messaging_endpoint must be a non-empty path starting with '/'.")
+venv\Lib\site-packages\microsoft_teams\apps\http\http_server.py:44:        self._messaging_endpoint = normalized_endpoint
+venv\Lib\site-packages\microsoft_teams\apps\http\http_server.py:57:    def messaging_endpoint(self) -> str:
+venv\Lib\site-packages\microsoft_teams\apps\http\http_server.py:59:        return self._messaging_endpoint
+venv\Lib\site-packages\microsoft_teams\apps\http\http_server.py:96:            logger.debug("JWT validation enabled for %s", self._messaging_endpoint)
+venv\Lib\site-packages\microsoft_teams\apps\http\http_server.py:109:                self._messaging_endpoint,
+venv\Lib\site-packages\microsoft_teams\apps\http\http_server.py:112:        self._adapter.register_route("POST", self._messaging_endpoint, self.handle_request)
+venv\Lib\site-packages\microsoft_teams\apps\options.py:95:    messaging_endpoint: Optional[str]
+venv\Lib\site-packages\microsoft_teams\apps\options.py:184:    messaging_endpoint: str = "/api/messages"

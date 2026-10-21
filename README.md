@@ -1,93 +1,301 @@
 # Expense Policy Agent
 
+Production-ready Django backend for processing expense receipts with Microsoft Teams integration, Azure Blob Storage, and Azure AI Document Intelligence.
 
+## Architecture Overview
 
-## Getting started
+- **Frontend**: Microsoft Teams + Teams SDK
+- **Backend**: Django REST Framework
+- **Database**: PostgreSQL
+- **Storage**: Azure Blob Storage
+- **OCR**: Azure AI Document Intelligence
+- **Background Processing**: Celery + Redis
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
-
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
-
-## Add your files
-
-* [Create](https://docs.gitlab.com/user/project/repository/web_editor/#create-a-file) or [upload](https://docs.gitlab.com/user/project/repository/web_editor/#upload-a-file) files
-* [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
+## Core Flow
 
 ```
-cd existing_repo
-git remote add origin https://gitlab.version1.com/shared/idc-innovation-labs/interns-projects/expense-policy-agent.git
-git branch -M main
-git push -uf origin main
+Upload Receipt
+    ↓
+Calculate SHA-256 hash
+    ↓
+Exact duplicate check (PostgreSQL)
+    ├─ Duplicate found? → Reject
+    └─ Unique? → Continue
+    ↓
+Azure AI Document Intelligence (OCR)
+    ↓
+Normalize extracted fields
+    ↓
+Semantic duplicate check
+    ├─ Duplicate found? → Reject
+    └─ Unique? → Continue
+    ↓
+Policy validation (35-day age rule)
+    ├─ Pass? → Approve
+    └─ Fail? → Reject
 ```
 
-## Integrate with your tools
+## Prerequisites
 
-* [Set up project integrations](https://gitlab.version1.com/shared/idc-innovation-labs/interns-projects/expense-policy-agent/-/settings/integrations)
+- Python 3.11+
+- PostgreSQL 12+
+- Redis (for Celery)
+- Azure Storage Account
+- Azure AI Document Intelligence
+- Microsoft Teams / Entra setup
 
-## Collaborate with your team
+## Setup
 
-* [Invite team members and collaborators](https://docs.gitlab.com/user/project/members/)
-* [Create a new merge request](https://docs.gitlab.com/user/project/merge_requests/creating_merge_requests/)
-* [Automatically close issues from merge requests](https://docs.gitlab.com/user/project/issues/managing_issues/#closing-issues-automatically)
-* [Enable merge request approvals](https://docs.gitlab.com/user/project/merge_requests/approvals/)
-* [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
+### 1. Environment Setup
 
-## Test and Deploy
+```bash
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+pip install -r requirements.txt
+```
 
-Use the built-in continuous integration in GitLab.
+### 2. Configuration
 
-* [Get started with GitLab CI/CD](https://docs.gitlab.com/ci/quick_start/)
-* [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/user/application_security/sast/)
-* [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/topics/autodevops/requirements/)
-* [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/user/clusters/agent/)
-* [Set up protected environments](https://docs.gitlab.com/ci/environments/protected_environments/)
+Copy `.env.example` to `.env` and configure:
 
-***
+```bash
+cp .env.example .env
+```
 
-# Editing this README
+Update `.env` with your Azure credentials and database details.
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+### 3. Database Setup
 
-## Suggestions for a good README
+```bash
+python manage.py migrate
+```
 
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+Create superuser for admin:
 
-## Name
-Choose a self-explaining name for your project.
+```bash
+python manage.py createsuperuser
+```
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+### 4. Run Django Development Server
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
+```bash
+python manage.py runserver
+```
 
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+Server runs on `http://localhost:8000`
 
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+### 5. Run Celery Worker (in separate terminal)
 
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
+```bash
+celery -A celery_app worker --loglevel=info
+```
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+### 6. Frontend Development (React + Vite)
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+The web frontend is being migrated from Django templates to React. During development, both can run side-by-side.
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
+#### Start React Development Server
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+```bash
+cd frontend
+npm install
+npm run dev
+```
 
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+React development server runs on `http://localhost:5173`
 
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+#### Build React for Production
 
-## License
-For open source projects, say how it is licensed.
+```bash
+cd frontend
+npm run build
+```
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+Output goes to `frontend/dist/`
+
+#### Environment Configuration
+
+Copy `frontend/.env.example` to `frontend/.env`:
+
+```bash
+cp frontend/.env.example frontend/.env
+```
+
+During local development, React proxies API calls to Django on `http://localhost:8000`.
+
+#### Current Status
+
+- **Phase 1**: React + Vite foundation complete
+- **Existing Django templates**: Still active at `http://localhost:8000`
+- **React pages**: Available at `http://localhost:5173/upload` and `http://localhost:5173/finance` (placeholder UI only)
+- **Teams bot**: Unchanged; still uses Adaptive Cards
+- **Backend APIs**: Unchanged; serve both Django and React frontends
+
+## API Endpoints
+
+### Upload Receipt
+
+```
+POST /api/v1/receipts/upload
+Content-Type: multipart/form-data
+
+file: <binary file>
+owner: user-id (optional, defaults to "default-user")
+```
+
+Response:
+```json
+{
+  "receipt_id": "uuid",
+  "status": "QUEUED_FOR_OCR",
+  "message": "Receipt uploaded successfully and is being processed.",
+  "is_final": false
+}
+```
+
+### Check Receipt Status
+
+```
+GET /api/v1/receipts/{receipt_id}
+```
+
+Response:
+```json
+{
+  "id": "uuid",
+  "status": "UNIQUE",
+  "stage": "policy",
+  "is_final": false,
+  "message": "No duplicate found. Checking expense policy.",
+  "duplicate_score": null,
+  "policy_status": null
+}
+```
+
+### List User Receipts
+
+```
+GET /api/v1/receipts/?owner=user-id
+```
+
+### Get Full Receipt Details
+
+```
+GET /api/v1/receipts/{receipt_id}/details
+```
+
+## Statuses
+
+- `UPLOADED` — File uploaded
+- `HASHING` — Calculating SHA-256
+- `EXACT_DUPLICATE` — Same file already exists
+- `QUEUED_FOR_OCR` — Waiting for processing
+- `OCR_PROCESSING` — Extracting fields
+- `EXTRACTED` — Fields extracted
+- `NORMALIZED` — Data normalized
+- `DUPLICATE_CHECKING` — Comparing with existing receipts
+- `SEMANTIC_DUPLICATE` — Business duplicate found
+- `UNIQUE` — No duplicate
+- `POLICY_PROCESSING` — Validating policies
+- `APPROVED` — Receipt approved
+- `REJECTED` — Receipt rejected by policy
+- `FAILED` — Processing failed
+
+## Testing
+
+Run test suite:
+
+```bash
+python manage.py test receipts
+```
+
+## Services
+
+### FileValidationService
+Validates file type and size.
+
+### HashingService
+Calculates SHA-256 hash of file content for exact duplicate detection.
+
+### BlobService
+Uploads/downloads receipts from Azure Blob Storage.
+
+### DocumentIntelligenceService
+Calls Azure AI Document Intelligence for OCR and field extraction.
+
+### NormalizationService
+Converts Azure output to stable internal JSON contract.
+
+### DuplicateService
+Performs semantic duplicate detection using:
+- Invoice + Vendor (strong signal)
+- Vendor + Date + Amount (fallback)
+- Weighted scoring (0-100)
+
+### PolicyService
+Validates receipt against policy rules (currently: 35-day age limit).
+
+### ReceiptService
+Orchestrates upload and processing workflows.
+
+## Configuration
+
+Key environment variables:
+
+- `DJANGO_SECRET_KEY` — Secret for Django
+- `POSTGRES_*` — PostgreSQL connection
+- `AZURE_STORAGE_CONNECTION_STRING` — Blob Storage
+- `AZURE_DOCUMENT_INTELLIGENCE_*` — OCR credentials
+- `MAX_RECEIPT_UPLOAD_MB` — Max file size (default: 10)
+- `RECEIPT_MAX_AGE_DAYS` — Policy age limit (default: 35)
+- `DUPLICATE_SCORE_THRESHOLD` — Duplicate threshold (default: 90)
+- `REVIEW_SCORE_THRESHOLD` — Review threshold (default: 75)
+
+## Database Models
+
+### Receipt
+
+Complete receipt record including:
+- File metadata (hash, blob reference)
+- Extracted OCR fields
+- Normalized data (JSONB)
+- Duplicate tracking (exact + semantic)
+- Policy validation results
+
+See `receipts/models.py` for full schema.
+
+## Admin Interface
+
+Access Django admin at `/admin` with superuser credentials.
+
+Browse/manage receipts with filtering by status, date, vendor.
+
+## Error Handling
+
+System raises controlled exceptions:
+
+- `UnsupportedFileTypeError` — Invalid file type
+- `ReceiptTooLargeError` — File exceeds size limit
+- `BlobUploadError` — Azure Blob upload failed
+- `DocumentExtractionError` — OCR failed
+- `ReceiptNormalizationError` — Normalization failed
+- `DuplicateReceiptError` — Duplicate detected
+- `PolicyValidationError` — Policy check failed
+
+## Security
+
+- Secrets in environment variables only
+- PostgreSQL parameterized queries
+- File validation before upload
+- Private Blob Storage containers
+- Safe filename handling
+- HTTPS in production
+
+## Next Steps
+
+1. Teams app integration layer
+2. User authentication (Azure AD)
+3. Additional policy rules
+4. Approval workflows
+5. Notification system
+6. Analytics dashboard
