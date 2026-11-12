@@ -1,14 +1,26 @@
 import os
 from pathlib import Path
 from dotenv import load_dotenv
+from django.core.exceptions import ImproperlyConfigured
 
 load_dotenv()
 
+
+def _require_env(name, allow_empty=False):
+    """Return a required environment variable or fail fast at startup."""
+    value = os.getenv(name)
+    if value is None or (not allow_empty and value.strip() == ''):
+        raise ImproperlyConfigured(
+            f"Required environment variable '{name}' is not set. See .env.example."
+        )
+    return value
+
+
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
-SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'dev-key-not-for-production')
+SECRET_KEY = _require_env('DJANGO_SECRET_KEY')
 DEBUG = os.getenv('DJANGO_DEBUG', 'True') == 'True'
-ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+ALLOWED_HOSTS = _require_env('DJANGO_ALLOWED_HOSTS').split(',')
 
 INSTALLED_APPS = [
     'django.contrib.contenttypes',
@@ -54,10 +66,10 @@ else:
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.postgresql',
-            'NAME': os.getenv('POSTGRES_DB', 'expense_policy'),
-            'USER': os.getenv('POSTGRES_USER', 'postgres'),
-            'PASSWORD': os.getenv('POSTGRES_PASSWORD', ''),
-            'HOST': os.getenv('POSTGRES_HOST', 'localhost'),
+            'NAME': _require_env('POSTGRES_DB'),
+            'USER': _require_env('POSTGRES_USER'),
+            'PASSWORD': _require_env('POSTGRES_PASSWORD', allow_empty=True),
+            'HOST': _require_env('POSTGRES_HOST'),
             'PORT': os.getenv('POSTGRES_PORT', '5432'),
         }
     }
@@ -82,7 +94,7 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [],
 }
 
-CORS_ALLOWED_ORIGINS = os.getenv('CORS_ALLOWED_ORIGINS', 'http://localhost:3000').split(',')
+CORS_ALLOWED_ORIGINS = _require_env('CORS_ALLOWED_ORIGINS').split(',')
 
 MAX_RECEIPT_UPLOAD_MB = int(os.getenv('MAX_RECEIPT_UPLOAD_MB', '10'))
 RECEIPT_MAX_AGE_DAYS = int(os.getenv('RECEIPT_MAX_AGE_DAYS', '35'))
@@ -95,8 +107,8 @@ AZURE_STORAGE_CONTAINER_NAME = os.getenv('AZURE_STORAGE_CONTAINER_NAME', 'receip
 AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT = os.getenv('AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT')
 AZURE_DOCUMENT_INTELLIGENCE_KEY = os.getenv('AZURE_DOCUMENT_INTELLIGENCE_KEY')
 
-CELERY_BROKER_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
-CELERY_RESULT_BACKEND = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
+CELERY_BROKER_URL = _require_env('REDIS_URL')
+CELERY_RESULT_BACKEND = CELERY_BROKER_URL
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
