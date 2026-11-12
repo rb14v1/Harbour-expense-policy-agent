@@ -15,7 +15,17 @@ class TeamsAuthValidator:
     """
 
     TEAMS_ISSUER = "https://api.botframework.com"
-    MICROSOFT_OPENID_CONFIG = "https://login.botframework.com/.well-known/openidconfiguration"
+    MICROSOFT_OPENID_CONFIG = "https://login.botframework.com/v1/.well-known/openidconfiguration"
+    MICROSOFT_JWKS_URI = "https://login.botframework.com/v1/.well-known/keys"
+    ALLOWED_ALGORITHMS = ["RS256"]
+
+    _jwks_client = None
+
+    @classmethod
+    def _get_jwks_client(cls):
+        if cls._jwks_client is None:
+            cls._jwks_client = jwt.PyJWKClient(cls.MICROSOFT_JWKS_URI)
+        return cls._jwks_client
 
     @staticmethod
     def verify_teams_request(request):
@@ -37,9 +47,15 @@ class TeamsAuthValidator:
                 logger.info("Skipping Teams token validation in DEBUG mode")
                 return True, "OK"
 
+            signing_key = TeamsAuthValidator._get_jwks_client().get_signing_key_from_jwt(token)
+
             payload = jwt.decode(
                 token,
-                options={"verify_signature": False}
+                signing_key.key,
+                algorithms=TeamsAuthValidator.ALLOWED_ALGORITHMS,
+                audience=settings.TEAMS_APP_ID,
+                issuer=TeamsAuthValidator.TEAMS_ISSUER,
+                options={"require": ["exp", "iss", "aud"]},
             )
 
             bot_id = payload.get("aud")
